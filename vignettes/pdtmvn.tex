@@ -1,0 +1,169 @@
+%\VignetteIndexEntry{The pdtmvn package}
+%\VignetteEngine{knitr::knitr}
+
+\documentclass[fleqn]{article}\usepackage[]{graphicx}\usepackage[]{color}
+%% maxwidth is the original width if it is less than linewidth
+%% otherwise use linewidth (to make sure the graphics do not exceed the margin)
+\makeatletter
+\def\maxwidth{ %
+  \ifdim\Gin@nat@width>\linewidth
+    \linewidth
+  \else
+    \Gin@nat@width
+  \fi
+}
+\makeatother
+
+\definecolor{fgcolor}{rgb}{0.345, 0.345, 0.345}
+\newcommand{\hlnum}[1]{\textcolor[rgb]{0.686,0.059,0.569}{#1}}%
+\newcommand{\hlstr}[1]{\textcolor[rgb]{0.192,0.494,0.8}{#1}}%
+\newcommand{\hlcom}[1]{\textcolor[rgb]{0.678,0.584,0.686}{\textit{#1}}}%
+\newcommand{\hlopt}[1]{\textcolor[rgb]{0,0,0}{#1}}%
+\newcommand{\hlstd}[1]{\textcolor[rgb]{0.345,0.345,0.345}{#1}}%
+\newcommand{\hlkwa}[1]{\textcolor[rgb]{0.161,0.373,0.58}{\textbf{#1}}}%
+\newcommand{\hlkwb}[1]{\textcolor[rgb]{0.69,0.353,0.396}{#1}}%
+\newcommand{\hlkwc}[1]{\textcolor[rgb]{0.333,0.667,0.333}{#1}}%
+\newcommand{\hlkwd}[1]{\textcolor[rgb]{0.737,0.353,0.396}{\textbf{#1}}}%
+
+\usepackage{framed}
+\makeatletter
+\newenvironment{kframe}{%
+ \def\at@end@of@kframe{}%
+ \ifinner\ifhmode%
+  \def\at@end@of@kframe{\end{minipage}}%
+  \begin{minipage}{\columnwidth}%
+ \fi\fi%
+ \def\FrameCommand##1{\hskip\@totalleftmargin \hskip-\fboxsep
+ \colorbox{shadecolor}{##1}\hskip-\fboxsep
+     % There is no \\@totalrightmargin, so:
+     \hskip-\linewidth \hskip-\@totalleftmargin \hskip\columnwidth}%
+ \MakeFramed {\advance\hsize-\width
+   \@totalleftmargin\z@ \linewidth\hsize
+   \@setminipage}}%
+ {\par\unskip\endMakeFramed%
+ \at@end@of@kframe}
+\makeatother
+
+\definecolor{shadecolor}{rgb}{.97, .97, .97}
+\definecolor{messagecolor}{rgb}{0, 0, 0}
+\definecolor{warningcolor}{rgb}{1, 0, 1}
+\definecolor{errorcolor}{rgb}{1, 0, 0}
+\newenvironment{knitrout}{}{} % an empty environment to be redefined in TeX
+
+\usepackage{alltt}
+
+\usepackage{geometry} 
+\geometry{letterpaper, top=1.5cm, left=2cm, right=2cm}
+
+\usepackage{amssymb, amsmath, amsfonts}
+
+
+\include{GrandMacros}
+\newcommand{\cdf}{{c.d.f.} }
+\newcommand{\pdf}{{p.d.f.} }
+\newcommand{\ind}{\mathbb{I}}
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\begin{document}
+
+\section{Introduction}
+\label{sec:intro}
+
+It is often necessary to model the distribution of a random vector where one or more of the component random variables is discrete, some may be continuous, and there is some correlation among these variables.  There are several possible approaches in such circumstances.  This package provides functionality for one such approach, in which the distribution of the data is represented as a partially discretized truncated multivariate normal distribution (pdTMVN).
+
+This document is organized as follows: In Section \ref{sec:notation} we establish notation that will be used throughout this document.  Then in Section \ref{sec:definition} we give a careful statement of the cumulative distribution and probability density functions for the pdTMVN distribution.  Next, in Section \ref{sec:evalDensity} we outline how the density function are computed internally.  In Section \ref{sec:examples} we give some examples of how the functions in this package can be used to define the parameters of a pdTMVN distribution, evaluate its \cdf and \pdf, and draw samples from it.
+
+\section{Notation}
+\label{sec:notation}
+
+$\ind_{A}(x) = \begin{cases} 1 & \text{ if $x \in A$} \\
+0 & \text{ otherwise}
+\end{cases}$
+
+The density function of the multivariate normal distribution will be written as $f^{MVN}(x ; \bmu, \Sigma)$.  In cases where we wish to parameterize the distribution in terms of the precision matrix $\Psi$, we will write $f^{MVN}(x ; \bmu, \Psi^{-1})$.
+
+In order to illustrate these calculations, we partition the distribution parameters according to the discrete and continuous parts of $\bx$:
+\begin{equation*}
+$\bmu = \begin{bmatrix}
+\bmu_d \\ \bmu_c
+\end{bmatrix}, \qquad \Sigma = \begin{bmatrix}
+\Sigma_d & \Sigma_{dc} \\
+\Sigma_{cd} & \Sigma_{c}
+\end{bmatrix}, \qquad \Psi = \begin{bmatrix}
+\Psi_{d} & \Psi_{dc} \\
+\Psi_{cd} & \Psi_{c}
+\end{bmatrix}
+\end{equation*}
+
+
+\section{Defining the Partially Discretized Truncated Multivariate Normal Distribution}
+\label{sec:definition}
+
+This distribution is based on an underlying truncated multivariate normal distribution, so it can capture covariance between the components of the random vector and represent distributions over restricted subsets of the real line.  In order to represent the distribution of discrete random variables, we discretize this underlying truncated multivariate normal distribution along the dimensions corresponding to the discrete variables by integrating the underlying truncated multivariate normal over those dimensions.
+
+
+\section{Evaluating the pdTMVN Density Function}
+\label{sec:evalDensity}
+
+We saw in Section 3 that we can represent the density function for the pdTMVN distribution as follows:
+\begin{equation}
+f^{pdTMVN}(\bx ; \bmu, \Sigma, \bl, \bu) = \idotsint\limits_{\prod_{j=1}^{J_d} (a_{x_j}, b_{x_j}]} f^{TMVN}\left(\begin{bmatrix} \bxi \\ \bx_c \end{bmatrix}; \bmu, \Sigma, \bl, \bu\right) \, d \xi_1 \cdots d \xi_{J_d} \label{eqn:pdtmvnDensityFn}
+\end{equation}
+
+In evaluating this integral, it is helpful to decompose the joint density for $\bxi$ and $\bx_c$ into the marginal density for $\bx_c$ and the conditional density for $\bxi | \bx_c$.  The terms that do not involve $\bxi$ come out of the integral, and the integral can then be computed using the functionality provided in {\tt R}'s {\tt tmvtnorm} package.  These calculations are as follows:
+\begin{align}
+&f^{pdTMVN}(\bx ; \bmu, \Sigma, \bl, \bu) = \idotsint\limits_{\prod_{j=1}^{J_d} (a_{x_j}, b_{x_j}]} f^{TMVN}\left(\begin{bmatrix} \bxi \\ \bx_c \end{bmatrix}; \bmu, \Sigma, \bl, \bu\right) \, d \xi_1 \cdots d \xi_{J_d} \nonumber \\
+&\qquad = \idotsint\limits_{\prod_{j=1}^{J_d} (a_{x_j}, b_{x_j}]} \left[ \ind_{\prod_{j=1}^J [l_j, u_j]}\left(\begin{bmatrix} \bxi \\ \bx_c \end{bmatrix}\right) \right. \nonumber \\
+&\qquad \qquad \left. \times \frac{f^{MVN}\left(\bx_c; \bmu_c, \Sigma_c \right) f^{MVN}\left(\bxi; \bmu_d + \Sigma_{dc} \Sigma_c^{-1}(\bx_c - \bmu_c), \Sigma_d - \Sigma_{dc} \Sigma_{c}^{-1} \Sigma_{cd} \right)}{\idotsint\limits_{\prod_{j=1}^J [l_j, u_j]} f^{MVN}(\bz ; \bmu, \Sigma) \, d \bz } \right] \, d \xi_1 \cdots d \xi_{J_d} \nonumber \\
+&\qquad = \frac{\ind_{\prod_{j=1}^J [l_j, u_j]}\left(\begin{bmatrix} \bxi \\ \bx_c \end{bmatrix}\right) f^{MVN}\left(\bx_c; \bmu_c, \Sigma_c \right)}{\idotsint\limits_{\prod_{j=1}^J [l_j, u_j]} f^{MVN}(\bz ; \bmu, \Sigma) \, d \bz } \nonumber \\
+&\qquad \qquad \times \idotsint\limits_{\prod_{j=1}^{J_d} (a_{x_j}, b_{x_j}]} f^{MVN}\left(\bxi; \bmu_d + \Sigma_{dc} \Sigma_c^{-1}(\bx_c - \bmu_c), \Sigma_d - \Sigma_{dc} \Sigma_{c}^{-1} \Sigma_{cd} \right) \, d \xi_1 \cdots d \xi_{J_d} \label{eqn:evalDensityInTermsOfSigma}
+\end{align}
+
+If we know the elements of the precision matrix $\Psi$ but $\Sigma$ has not been explicitly calculated, we can rewrite Equation~\eqref{eqn:evalDensitykfMVNxi} in terms of the elements of $\Psi$ by making use of the standard result from matrix algebra for computing the inverse of a block matrix $A = \begin{bmatrix}
+A_{1} & A_{12} \\
+A_{21} & A_{2}
+\end{bmatrix}$ that is partitioned such that $A_2$ and $A_1 - A_{12} A_{2}^{-1} A_{21}$ are invertible:
+\begin{align*}
+\begin{bmatrix}
+A_{1} & A_{12} \\
+A_{21} & A_{2}
+\end{bmatrix}^{-1} = \begin{bmatrix}
+(A_{1} - A_{12} A_2^{-1} A_{21})^{-1} & - (A_{1} - A_{12} A_2^{-1} A_{21})^{-1} A_{12} A_{2}^{-1} \\
+- A_{2}^{-1} A_{21} (A_{1} - A_{12} A_2^{-1} A_{21})^{-1} & A_{2}^{-1} + A_{2}^{-1} A_{21} (A_{1} - A_{12} A_2^{-1} A_{21})^{-1} A_{12} A_{2}^{-1}
+\end{bmatrix}
+\end{align*}
+
+Using this identity, we obtain the following expressions in terms of elements of $\Psi$:
+\begin{align*}
+\Sigma_c &= (\Psi_c - \Psi_{cd} \Psi_d^{-1} \Psi_{dc})^{-1} \\
+\Sigma_{dc} \Sigma_c^{-1} &= - \Psi_d^{-1} \Psi_{dc} (\Psi_c - \Psi_{cd} \Psi_d^{-1} \Psi_{dc})^{-1} (\Psi_c - \Psi_{cd} \Psi_d^{-1} \Psi_{dc}) \\
+&= - \Psi_d^{-1} \Psi_{dc} \\
+\Sigma_d - \Sigma_{dc} \Sigma_c^{-1} \Sigma_{cd} &= \Psi_{d}^{-1}
+\end{align*}
+
+We can now rewrite Equation~\eqref{eqn:evalDensityInTermsOfSigma} in terms of the elements of $\Psi$ as follows:
+\begin{align}
+&f^{pdTMVN}(\bx ; \bmu, \Psi^{-1}, \bl, \bu) = \frac{\ind_{\prod_{j=1}^J [l_j, u_j]}\left(\begin{bmatrix} \bxi \\ \bx_c \end{bmatrix}\right) f^{MVN}\left(\bx_c; \bmu_c, (\Psi_c - \Psi_{cd} \Psi_d^{-1} \Psi_{dc})^{-1} \right)}{\idotsint\limits_{\prod_{j=1}^J [l_j, u_j]} f^{MVN}(\bz ; \bmu, \Psi^{-1}) \, d \bz } \nonumber \\
+&\qquad \qquad \times \idotsint\limits_{\prod_{j=1}^{J_d} (a_{x_j}, b_{x_j}]} f^{MVN}\left(\bxi; \bmu_d - \Psi_d^{-1} \Psi_{dc}(\bx_c - \bmu_c), \Psi_d^{-1} \right) \, d \xi_1 \cdots d \xi_{J_d} \label{eqn:evalDensityInTermsOfSigma}
+\end{align}
+
+%Now working with just the numerator in this expression, we have
+%\begin{align}
+%&f^{MVN}\left(\begin{bmatrix} \bxi \\ \bx_c \end{bmatrix}; \bmu, \Psi^{-1} \right) \nonumber \\
+%&\qquad = (2 \pi)^{-\frac{J}{2}} \vert \Psi \vert^{\frac{1}{2}} \exp\left[ -\frac{1}{2} \left\{\begin{bmatrix} \bxi \\ \bx_c \end{bmatrix} - \begin{bmatrix} \bmu_d \\ \bmu_c \end{bmatrix} \right\}' \Psi \left\{\begin{bmatrix} \bxi \\ \bx_c \end{bmatrix} - \begin{bmatrix} \bmu_d \\ \bmu_c \end{bmatrix} \right\} \right] \nonumber \\
+%&\qquad = (2 \pi)^{-\frac{J}{2}} \vert \Psi \vert^{\frac{1}{2}} \exp\left[ -\frac{1}{2} \left\{ \vphantom{\frac{1}{2}} \bxi' \Psi_d \bxi + 2 \bxi' [ \Psi_{dc} (\bx_c - \bmu_c) - \Psi_d \bmu_d ] \right. \right. \nonumber \\
+%&\qquad \qquad \left. \left. - 2 \bmu_d' \Psi_{dc} (\bx_c - \bmu_c) + \bmu_d' \Psi_d \bmu_d + (\bx_c - \bmu_c)' \Psi_c (\bx_c - \bmu_c) \vphantom{\frac{1}{2}} \right\} \vphantom{\frac{1}{2}} \right] \nonumber \\
+%&\qquad = (2 \pi)^{-\frac{J}{2}} \vert \Psi \vert^{\frac{1}{2}} \exp\left[ -\frac{1}{2} \left\{ \vphantom{\frac{1}{2}} \left\{ \bxi - \Psi_d^{-1} [ \Psi_d \bmu_d - \Psi_{dc} (\bx_c - \bmu_c) ] \right\}' \Psi_d \left\{ \bxi - \Psi_d^{-1} [ \Psi_d \bmu_d - \Psi_{dc} (\bx_c - \bmu_c) ] \right\} \right. \right. \nonumber \\
+%&\qquad \qquad \left. \left. - \{ \Psi_d \bmu_d - \Psi_{dc} (\bx_c - \bmu_c) \}' \Psi_d^{-1} \{ \Psi_d \bmu_d - \Psi_{dc} (\bx_c - \bmu_c) \}  \right. \right. \nonumber \\
+%&\qquad \qquad \left. \left. - 2 \bmu_d' \Psi_{dc} (\bx_c - \bmu_c) + \bmu_d' \Psi_d \bmu_d + (\bx_c - \bmu_c)' \Psi_c (\bx_c - \bmu_c) \vphantom{\frac{1}{2}} \right\} \right] \nonumber \\
+%&\qquad = (2 \pi)^{-\frac{J_c}{2}} \vert \Psi \vert^{\frac{1}{2}} \vert \Psi_d \vert^{- \frac{1}{2}} f^{MVN}(\bxi ; \Psi_d^{-1} \Psi_{dc} (\bx_c - \bmu_c) - \bmu_d, \Psi_d^{-1}) \nonumber \\
+%&\qquad \qquad \times \exp\left[- \frac{1}{2} (\bx_c - \bmu_c)' (\Psi_c - \Psi_{cd} \Psi_d^{-1} \Psi_{dc}) (\bx_c - \bmu_c) \vphantom{\frac{1}{2}} \right] \label{eqn:evalDensitykfMVNxi}
+%\end{align}
+
+
+
+\section{Examples}
+\label{sec:examples}
+
+
+
+\end{document}
