@@ -55,7 +55,9 @@ dpdtmvn <- function(x,
 		conditional_mean_discrete_offset_multiplier,
 		continuous_vars = seq_along(mean),
 		discrete_vars = NULL,
-		discrete_var_range_functions = ,
+		discrete_var_range_functions = sapply(seq_along(discrete_vars), function(dv) {
+			c("floor_x_minus_1", "floor")
+		}),
 		log = FALSE,
 		validate_params = TRUE) {
 	
@@ -423,4 +425,9 @@ compute_trunc_const_pdtmvn <- function(mean, sigma, precision, lower, upper) {
 	exp_trunc_const <- pmvnorm(lower=lower, upper=upper, mean=mean, sigma=sigma)
 	
 	return(log(exp_trunc_const))
+}
+
+
+floor_x_minus_1 <- function(x) {
+	return(floor(x) - 1)
 }
