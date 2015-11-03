@@ -1,56 +1,7 @@
 %\VignetteIndexEntry{The pdtmvn package}
 %\VignetteEngine{knitr::knitr}
 
-\documentclass[fleqn]{article}\usepackage[]{graphicx}\usepackage[]{color}
-%% maxwidth is the original width if it is less than linewidth
-%% otherwise use linewidth (to make sure the graphics do not exceed the margin)
-\makeatletter
-\def\maxwidth{ %
-  \ifdim\Gin@nat@width>\linewidth
-    \linewidth
-  \else
-    \Gin@nat@width
-  \fi
-}
-\makeatother
-
-\definecolor{fgcolor}{rgb}{0.345, 0.345, 0.345}
-\newcommand{\hlnum}[1]{\textcolor[rgb]{0.686,0.059,0.569}{#1}}%
-\newcommand{\hlstr}[1]{\textcolor[rgb]{0.192,0.494,0.8}{#1}}%
-\newcommand{\hlcom}[1]{\textcolor[rgb]{0.678,0.584,0.686}{\textit{#1}}}%
-\newcommand{\hlopt}[1]{\textcolor[rgb]{0,0,0}{#1}}%
-\newcommand{\hlstd}[1]{\textcolor[rgb]{0.345,0.345,0.345}{#1}}%
-\newcommand{\hlkwa}[1]{\textcolor[rgb]{0.161,0.373,0.58}{\textbf{#1}}}%
-\newcommand{\hlkwb}[1]{\textcolor[rgb]{0.69,0.353,0.396}{#1}}%
-\newcommand{\hlkwc}[1]{\textcolor[rgb]{0.333,0.667,0.333}{#1}}%
-\newcommand{\hlkwd}[1]{\textcolor[rgb]{0.737,0.353,0.396}{\textbf{#1}}}%
-
-\usepackage{framed}
-\makeatletter
-\newenvironment{kframe}{%
- \def\at@end@of@kframe{}%
- \ifinner\ifhmode%
-  \def\at@end@of@kframe{\end{minipage}}%
-  \begin{minipage}{\columnwidth}%
- \fi\fi%
- \def\FrameCommand##1{\hskip\@totalleftmargin \hskip-\fboxsep
- \colorbox{shadecolor}{##1}\hskip-\fboxsep
-     % There is no \\@totalrightmargin, so:
-     \hskip-\linewidth \hskip-\@totalleftmargin \hskip\columnwidth}%
- \MakeFramed {\advance\hsize-\width
-   \@totalleftmargin\z@ \linewidth\hsize
-   \@setminipage}}%
- {\par\unskip\endMakeFramed%
- \at@end@of@kframe}
-\makeatother
-
-\definecolor{shadecolor}{rgb}{.97, .97, .97}
-\definecolor{messagecolor}{rgb}{0, 0, 0}
-\definecolor{warningcolor}{rgb}{1, 0, 1}
-\definecolor{errorcolor}{rgb}{1, 0, 0}
-\newenvironment{knitrout}{}{} % an empty environment to be redefined in TeX
-
-\usepackage{alltt}
+\documentclass[fleqn]{article}
 
 \usepackage{geometry} 
 \geometry{letterpaper, top=1.5cm, left=2cm, right=2cm}
@@ -62,8 +13,10 @@
 \newcommand{\cdf}{{c.d.f.} }
 \newcommand{\pdf}{{p.d.f.} }
 \newcommand{\ind}{\mathbb{I}}
-\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+
+\usepackage{Sweave}
 \begin{document}
+\input{pdtmvn-concordance}
 
 \section{Introduction}
 \label{sec:intro}
@@ -83,7 +36,7 @@ The density function of the multivariate normal distribution will be written as 
 
 In order to illustrate these calculations, we partition the distribution parameters according to the discrete and continuous parts of $\bx$:
 \begin{equation*}
-$\bmu = \begin{bmatrix}
+\bmu = \begin{bmatrix}
 \bmu_d \\ \bmu_c
 \end{bmatrix}, \qquad \Sigma = \begin{bmatrix}
 \Sigma_d & \Sigma_{dc} \\
@@ -100,6 +53,49 @@ $\bmu = \begin{bmatrix}
 
 This distribution is based on an underlying truncated multivariate normal distribution, so it can capture covariance between the components of the random vector and represent distributions over restricted subsets of the real line.  In order to represent the distribution of discrete random variables, we discretize this underlying truncated multivariate normal distribution along the dimensions corresponding to the discrete variables by integrating the underlying truncated multivariate normal over those dimensions.
 
+Here we give a more detailed treatment of the partially discretized truncated multivariate normal distribution (pdTMVN).  Consider a $J$-dimensional random vector $\bX = (\bX^{d'}, \bX^{c'})'$ that is partitioned into a $J^d$-dimensional subvector $\bX^d$ of discrete random variables and a $J^c$-dimensional subvector $\bX^c$ of continuous random variables.  Without loss of generality, we assume that the discrete variables are the first $J^d$ variables.  For each component random variable $X^j$, $j = 1, \ldots, J$, we denote the domain of $X_j$ by $\mathcal{D}^j \subseteq \mathbb{R}$.  In the continuous cases, we take $\mathcal{D}^j = \mathbb{R}$.  In the discrete cases, $\mathcal{D}^j$ is a discrete set.  Our definitions could be modified to handle a component random variable whose distribution comprised a combination of discrete and continuous parts; however, this is not required for our applications so we have not pursued that line here.
+
+To facilitate our discussion, for any $x_j \in \mathbb{R}$ we define $a_{x_j} = \sup \{x_j^* \in \{ - \infty \} \bigcup \mathcal{D}^j: x_j^* < x_j \}$ and $b_{x_j} = \sup \{x_j^* \in \{ - \infty \} \bigcup \mathcal{D}^j: x_j^* \leq x_j \}$; the difference between these definitions is in the inequalities $x_j^* < x_j$ and $x_j^* \leq x_j$.  In the continuous case, $a_{x_j} = b_{x_j} = x_j$.  In the discrete case, we have the following:
+\begin{align}
+&a_{x_j} = \begin{cases} \text{the largest element of $\mathcal{D}^j$ that is less than $x_j$ if such an element exists} \\
+\text{$- \infty$ otherwise}
+\end{cases} \\
+&b_{x_j} = \begin{cases} \text{the largest element of $\mathcal{D}^j$ that is less than or equal to $x_j$ if such an element exists} \\
+\text{ $- \infty$ otherwise}
+\end{cases}
+\end{align}
+These facts follow from the definition of a discrete space.  For a vector $\bx$, we define $\ba_\bx = (a_{x_1}, \ldots, a_{x_J})$ and $\bb_\bx = (b_{x_1}, \ldots, b_{x_J})$.
+
+We define the pdTMVN distribution with parameters $\bmu$ and $\Sigma$ by specifying that its c.d.f. at the point $\bx$ agrees with the truncated multivariate normal c.d.f. when evaluated at $\bb_{\bx}$:
+\begin{align}
+F^{pdTMVN}(\bx ; \bmu, \Sigma, \bl, \bu) = F^{TMVN}(\bb_\bx ; \bmu, \Sigma, \bl, \bu) \label{eqn:pdTMVNcdfdefinition}
+\end{align}
+
+\lboxit{I'm not sure if this statement is true -- verify and include if true: We note that because of the effects of (truncation and) discretization, a random vector that follows the pdTMVN distribution may not have mean $\bmu$ and covariance $\Sigma$.}
+
+Let $\bnu = \times_{j = 1}^J \nu_j$ be the product measure where each univariate measure $\nu_j$ is either counting measure over $\mathcal{D}^j$ for the discrete component random variables or Lebesgue measure for the continuous component random variables.  Further, let $\bnu^d$ be the product measure corresponding to the discrete variables and $\bnu^c$ be the product measure corresponding to the continuous variables.  Then we can represent the joint density of $\bX \sim \text{pdTMVN}(\bmu, \Sigma)$ with respect to $\bnu$ as
+\begin{align}
+f^{pdTMVN}(\bx ; \bmu, \Sigma) = \begin{cases}
+\idotsint\limits_{\prod_{j=1}^{J^d} (a_{x^d_{j}}, x^d_{j}]} f^{TMVN}\{({\bxi^{d'}}, {\bx^{c'}})' ; \bmu, \Sigma, \bl, \bu\} d \xi_1 \, \cdots \, d \xi_{J^d} &\text{ if $\bx \in \mathcal{D}$} \\
+0 &\text{ otherwise}
+\end{cases} \label{eqn:pdTMVNpdfdefinition}
+\end{align}
+In this expression, $\prod_{j=1}^{J^d} A_j$ is the Cartesian product of the sets $A_1, \ldots, A_{J^d}$.  Note that the value that $f^{pdTMVN}$ takes when $\bx \notin \mathcal{D}$ is arbitrary.
+
+To see that Equation~\eqref{eqn:pdTMVNpdfdefinition} is correct, note that the probability measure corresponding to $F^{pdMVN}$ is absolutely continuous with respect to $\bnu$ and we can verify that for any $\bx \in \mathbb{R}^J$,
+\begin{align}
+&\idotsint\limits_{\{\bx^* \in \mathbb{R}^J : \bx^* \leq \bx \}} f^{pdTMVN}(\bx^* ; \bmu, \Sigma, \bl, \bu) d \bnu \label{eqn:pdTMVNpdfVerification1} \\
+&\qquad = \idotsint\limits_{\{\bx^* \in \mathcal{D} : \bx^* \leq \bx \}} f^{pdTMVN}(\bx^* ; \bmu, \Sigma, \bl, \bu) d \bnu + \idotsint\limits_{\{\bx^* \in \mathbb{R}^J \setminus \mathcal{D} : \bx^* \leq \bx \}} f^{pdTMVN}(\bx^* ; \bmu, \Sigma, \bl, \bu) d \bnu \label{eqn:pdTMVNpdfVerification2} \\
+&\qquad = \idotsint\limits_{\{\bx^* \in \mathcal{D} : \bx^* \leq \bb_\bx \}} \idotsint\limits_{\prod_{j=1}^{J^d}(a_{x^{*d}_j}, x^{*d}_j]} f^{TMVN}\{(\bxi^{d'}, \bx^{*c'})' ; \bmu, \Sigma, \bl, \bu\} d \xi_1 \, \cdots \, d \xi_{J^d} d \bnu \label{eqn:pdTMVNpdfVerification3} \\
+&\qquad = \idotsint\limits_{\{\bx^{*c} \in \mathcal{D}^c : \bx^{*c} \leq \bb_{\bx^c} \vphantom{\mathcal{D}^d}\}} \, \idotsint\limits_{\{\bx^{*d} \in \mathcal{D}^d : \bx^{*d} \leq \bb_{\bx^d} \}} \idotsint\limits_{\prod_{j=1}^{J^d} (a_{x^{*d}_j}, x^{*d}_j]} f^{TMVN}\{(\bxi^{d'}, \bx^{*c'})' ; \bmu, \Sigma, \bl, \bu\} d \xi_1 \, \cdots \, d \xi_{J^d} d \bnu^d \, d \bnu^c \label{eqn:pdTMVNpdfVerification4} \\
+&\qquad = \idotsint\limits_{\{\bx^{*c} \in \mathcal{D}^c : \bx^{*c} \leq \bb_{\bx^c} \vphantom{\mathcal{D}^d}\}} \mathop{\sum \cdots \sum \vphantom{\int}}\limits_{\{\bx^{*d} \in \mathcal{D}^d : \bx^{*d} \leq \bb_{\bx^d} \}} \idotsint\limits_{\prod_{j=1}^{J^d}(a_{x^{*d}_j}, x^{*d}_j]} f^{MVN}\{(\bxi^{d'}, \bx^{*c'})' ; \bmu, \Sigma, \bl, \bu\} d \xi_1 \, \cdots \, d \xi_{J^d} d \bnu^c \label{eqn:pdTMVNpdfVerification5} \\
+&\qquad = \idotsint\limits_{\{\bx^{*c} \in \mathcal{D}^c : \bx^{*c} \leq \bb_{\bx^c} \}} \int\limits_{\prod_{j=1}^{J^d} (- \infty, b_{x^{d}_j}]} f^{TMVN}\{(\bxi^{d'}, \bx^{*c'})' ; \bmu, \Sigma, \bl, \bu\} d \xi_1 \, \cdots \, d \xi_{J^d} d \bnu^c \label{eqn:pdTMVNpdfVerification6} \\
+&\qquad = \idotsint\limits_{\prod_{j=1}^{J}(- \infty, b_{x_j}]} f^{MVN}(\bx^* ; \bmu, \Sigma, \bl, \bu) d x^*_1 \, \cdots \, d x^*_{J} \label{eqn:pdTMVNpdfVerification7} \\
+&\qquad = F^{MVN}(\bb_\bx ; \bmu, \Sigma, \bl, \bu) \label{eqn:pdTMVNpdfVerification8} \\
+&\qquad = F^{pdMVN}(\bx ; \bmu, \Sigma, \bl, \bu) \label{eqn:pdTMVNpdfVerification9}
+\end{align}
+
+Throughout these equations, vector inequalities of the form $\bx^* \leq \bx$ are satisfied if $x^*_j \leq x_j \, \forall j$.  Equations \eqref{eqn:pdTMVNpdfVerification1} through \eqref{eqn:pdTMVNpdfVerification9} can be justified as follows.  In Equation~\eqref{eqn:pdTMVNpdfVerification2}, we partition the domain of integration from Equation~\eqref{eqn:pdTMVNpdfVerification1} into two disjoint subsets: those points in $\mathcal{D}$ and those points not in $\mathcal{D}$.  By the construction of $\bnu$, the integral of the second of these terms is $0$.  For the first term, we note that by the definition of $\bb_\bx$, $\{\bx^* \in \mathcal{D} : \bx^* \leq \bx \} = \{\bx^* \in \mathcal{D} : \bx^* \leq \bb_\bx \}$.  To obtain Equation~\eqref{eqn:pdTMVNpdfVerification3}, we use this fact and the definition of $f^{pdTMVN}$ from Equation~\eqref{eqn:pdTMVNpdfdefinition}.  In the next step, we use Fubini's theorem to rewrite the integral with respect to $\bnu$ in terms of integrals with respect to the continuous and discrete parts.  Since $\bnu^d$ is the product of counting measures, integration with respect to $\bnu^d$ is equivalent to summation.  In Equation~\eqref{eqn:pdMVNpdfVerification6}, we have made use of the fact that the collection of rectangles $\{\prod_{j=1}^{J^d}(a_{x^{*d}_j}, x^{*d}_j]: \bx^{*d} \in \mathcal{D}^d, \bx^{*d} \leq \bb_{\bx^d} \}$ forms a partition of the entire space $\prod_{j=1}^{J^d} (-\infty, b_{x^d}]$.  In Equation~\eqref{eqn:pdTMVNpdfVerification7} we have used Fubini's theorem again and renamed $\xi_j$ to $x^*_j$ for each $j = 1, \ldots, J^d$.  In Equations \eqref{eqn:pdTMVNpdfVerification8} and \eqref{eqn:pdTMVNpdfVerification9} we have used the definition of the c.d.f. of the TMVN distribution and of the pdTMVN distribution as introduced in Equation~\eqref{eqn:pdTMVNcdfdefinition}.
 
 \section{Evaluating the pdTMVN Density Function}
 \label{sec:evalDensity}
@@ -143,7 +139,7 @@ Using this identity, we obtain the following expressions in terms of elements of
 We can now rewrite Equation~\eqref{eqn:evalDensityInTermsOfSigma} in terms of the elements of $\Psi$ as follows:
 \begin{align}
 &f^{pdTMVN}(\bx ; \bmu, \Psi^{-1}, \bl, \bu) = \frac{\ind_{\prod_{j=1}^J [l_j, u_j]}\left(\begin{bmatrix} \bxi \\ \bx_c \end{bmatrix}\right) f^{MVN}\left(\bx_c; \bmu_c, (\Psi_c - \Psi_{cd} \Psi_d^{-1} \Psi_{dc})^{-1} \right)}{\idotsint\limits_{\prod_{j=1}^J [l_j, u_j]} f^{MVN}(\bz ; \bmu, \Psi^{-1}) \, d \bz } \nonumber \\
-&\qquad \qquad \times \idotsint\limits_{\prod_{j=1}^{J_d} (a_{x_j}, b_{x_j}]} f^{MVN}\left(\bxi; \bmu_d - \Psi_d^{-1} \Psi_{dc}(\bx_c - \bmu_c), \Psi_d^{-1} \right) \, d \xi_1 \cdots d \xi_{J_d} \label{eqn:evalDensityInTermsOfSigma}
+&\qquad \qquad \times \idotsint\limits_{\prod_{j=1}^{J_d} (a_{x_j}, b_{x_j}]} f^{MVN}\left(\bxi; \bmu_d - \Psi_d^{-1} \Psi_{dc}(\bx_c - \bmu_c), \Psi_d^{-1} \right) \, d \xi_1 \cdots d \xi_{J_d} \label{eqn:evalDensityInTermsOfPsi}
 \end{align}
 
 %Now working with just the numerator in this expression, we have
