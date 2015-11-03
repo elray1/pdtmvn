@@ -38,8 +38,10 @@
 #'   element is the name of a function that returns a(x) for any real x, and
 #'   the second is the name of a function that returns b(x) for any real x.
 #' @param log Logical; if TRUE, return value is log(density).
-#' @param validate Logical; if TRUE, all parameters are validated.  Can be set
-#'   to FALSE in settings where speed is critical, but this is risky!
+#' @param validate_level Numeric; if 0, no validation is performed (risky!).
+#'   If 1, parameters are validated but warnings about checks not performed are
+#'   not issued.  If 2, parameters are validated and warnings about checks not
+#'   performed are issued.
 #' 
 #' @return Density of pdTMVN distribution evaluated at x
 dpdtmvn <- function(x,
@@ -59,7 +61,7 @@ dpdtmvn <- function(x,
 			c("floor_x_minus_1", "floor")
 		}),
 		log = FALSE,
-		validate_params = TRUE) {
+		validate_level = TRUE) {
 	
 	## Convert x to matrix if a vector or data frame was passed in
 	if(is.vector(x)) {
@@ -71,7 +73,7 @@ dpdtmvn <- function(x,
 	}
 	
 	## Validate parameters
-	if(validate_params) {
+	if(validate_level > 0) {
 		validated_params <- validate_params_pdtmvn(x = x,
 			mean = mean,
 			sigma = sigma,
@@ -86,7 +88,7 @@ dpdtmvn <- function(x,
 				conditional_mean_discrete_offset_multiplier,
 			continuous_vars = continuous_vars,
 			discrete_vars = discrete_vars,
-			log = log)
+			validate_level = validate_level)
 		
 		## validate_params_pdtmvn may update some values that were passed in.
 		## Assign those updated values to the corresponding variables in the
@@ -238,12 +240,25 @@ dpdtmvn <- function(x,
 #'   covariance/precision and lower/upper truncation bounds, it may be helpful
 #'   to precompute the truncation constant for the distribution and pass that
 #'   in so that it is not re-calculated on every function call
+#' @param sigma_continuous Matrix containing the marginal
+#'   covariance matrix for the continuous variables.  Providing this saves a
+#'   small amount of computation time if precision is provided but sigma isn't.
+#' @param conditional_sigma_discrete Matrix containing the conditional covariance
+#'   of the discrete variables given the continuous variables.  Providing this
+#'   saves a small amount of computation time if sigma is provided but precision
+#'   isn't.
+#' @param conditional_mean_discrete_offset_multiplier Matrix containing
+#'   Sigma_dc Sigma_c^{-1}.  This is used in computing the mean of the underlying
+#'   multivariate normal distribution for the discrete variables conditioning on
+#'   the continuous variables.  Providing this saves a small amount of
+#'   computation time.
 #' @param continous_vars Vector containing either column names or column indices for
 #'   continous variables.
 #' @param discrete_vars Vector containing either column names or column indices for
 #'   discrete variables.
-#' @param log Logical; if TRUE, return value is log(density) or
-#'   log(probability).
+#' @param validate_level Numeric; if <= 1, validation is performed, but warnings
+#'   about things that were not checked are not issued.  If 2, validation is
+#'   performed and warnings about things that were not checked are issued.
 #' 
 #' @return Named list with parameter values after validation.
 validate_params_pdtmvn <- function(x,
@@ -254,13 +269,21 @@ validate_params_pdtmvn <- function(x,
 	upper,
 	norm_const,
 	trunc_const,
+	sigma_continuous,
+	conditional_sigma_discrete,
+	conditional_mean_discrete_offset_multiplier,
 	continuous_vars,
 	discrete_vars,
-	log) {
-	warning("parameter validation does not yet check whether your truncation limits make sense relative to your functions for computing the range of you discrete random variables.")
-	warning("parameter validation does not yet check whether your discrete_var_range_functions are in the same order as the discrete columns of x")
+	validate_level) {
 	
+	if(validate_level > 1) {
+		warning("parameter validation does not yet check whether your truncation limits make sense relative to your functions for computing the range of you discrete random variables.")
+		warning("parameter validation does not yet check whether your discrete_var_range_functions are in the same order as the discrete columns of x")
+	}
+	
+	## list of results
 	validated_params <- list()
+	
 	
 	## Validate x
 	if(!missing(x)) {
@@ -270,6 +293,7 @@ validate_params_pdtmvn <- function(x,
 		validated_params$x <- x
 	}
 	
+	
 	## Validate mean
 	if(!missing(mean)) {
 		if(!is.numeric(mean) || !identical(length(mean), ncol(x))) {
@@ -278,12 +302,16 @@ validate_params_pdtmvn <- function(x,
 		validated_params$mean <- mean
 	}
 	
+	
 	## Validate precision/covariance
 	if(!missing(sigma)) {
 		if(!is.numeric(sigma) || !is.matrix(sigma) ||
 			 	!(identical(nrow(sigma), ncol(x)) &&
 			  	identical(ncol(sigma), ncol(x)))) {
 			stop("sigma parameter must be a numeric J by J matrix where J is the number of covariates in x.")
+		}
+		if(validate_level > 1) {
+			warning("did not check that sigma is a p.d. symmetric matrix")
 		}
 		validated_params$sigma <- sigma
 	}
@@ -294,7 +322,17 @@ validate_params_pdtmvn <- function(x,
 			stop("precision parameter must be a numeric J by J matrix where J is the number of covariates in x.")
 		}
 		validated_params$precision <- precision
+		if(validate_level > 1) {
+			warning("did not check that precision is a p.d. symmetric matrix")
+			if(!missing(sigma)) {
+				warning("did not check that precision and sigma agree")
+			}
+		}
 	}
+	if(missing(sigma) && missing(precision)) {
+		validated_params$sigma <- sigma ## fill with default value
+	}
+	
 	
   ## Validate lower and upper bounds
 	if(!missing(lower)) {
@@ -309,6 +347,7 @@ validate_params_pdtmvn <- function(x,
 		}
 		validated_params$upper <- upper
 	}
+	
 	
 	## Validate norm_const and trunc_const; compute them if they are missing
 	if(!missing(norm_const)) {
@@ -335,6 +374,7 @@ validate_params_pdtmvn <- function(x,
 			upper = upper)
 	}
 	validated_params$trunc_const <- trunc_const
+	
 	
 	## Validate continous and discrete_vars.  We do the following:
 	##  1) convert character vectors to numeric.
@@ -400,6 +440,92 @@ validate_params_pdtmvn <- function(x,
 	validated_params$continuous_vars <- continuous_vars
 	validated_params$discrete_vars <- discrete_vars
 	
+	
+	## fill in values for sigma_continuous, conditional_sigma_discrete, and
+	## conditional_mean_discrete_offset_multiplier if they are missing
+	## if they are provided, these parameter values are not validated
+	if(length(continuous_vars) > 0) {
+		## Get sigma_continous
+		if(missing(sigma_continuous)) {
+			if("sigma" %in% names(validated_params)) {
+				## sigma_continuous is a subset of sigma
+				validated_params$sigma_continuous <- 
+					sigma[continuous_vars, continuous_vars, drop=FALSE]
+			} else {
+				## sigma_continuous can be calculated from precision
+				if(identical(length(discrete_vars), 0L)) {
+					validated_params$sigma_continuous <- solve(precision)
+				} else {
+					validated_params$sigma_continuous <- calc_Schur_complement(precision,
+						continuous_vars)
+				}
+			}
+		} else {
+			validated_params$sigma_continuous <- sigma_continuous
+			if(validate_level > 1) {
+				warning("did not check that provided sigma_continuous agrees with sigma/precision")
+			}
+		}
+		
+		## if there are both continuous and discrete variables, get
+		## conditional_sigma_discrete and conditional_mean_discrete_offset_multiplier
+		if(length(discrete_vars) > 0) {
+			## Get conditional_sigma_discrete
+			if(missing(conditional_sigma_discrete)) {
+				if(!missing(precision)) {
+					precision_d <- precision[discrete_vars, discrete_vars, drop=FALSE]
+					validated_params$conditional_sigma_discrete <- solve(precision_d)
+				} else {
+					validated_params$conditional_sigma_discrete <- 
+						calc_Schur_complement(validated_params$sigma, discrete_vars)
+				}
+			} else {
+				validated_params$conditional_sigma_discrete <- conditional_sigma_discrete
+				if(validate_level > 1) {
+					warning("did not check that provided conditional_sigma_discrete agrees with sigma/precision")
+				}
+			}
+			
+			## Get conditional_mean_discrete_offset_multiplier
+			if(missing(conditional_mean_discrete_offset_multiplier)) {
+				if(!missing(sigma)) {
+					sigma_dc <- sigma[discrete_vars, continuous_vars, drop=FALSE]
+					
+					validated_params$conditional_mean_discrete_offset_multiplier <-
+						sigma_dc * solve(validated_params$sigma_continuous)
+				} else {
+					precision_d <- precision[discrete_vars, discrete_vars, drop=FALSE]
+					precision_dc <- precision[discrete_vars, continuous_vars, drop=FALSE]
+
+					validated_params$conditional_mean_discrete_offset_multiplier <-
+						-1 * solve(precision_d) %*% precision_dc
+				}
+			} else {
+				validated_params$conditional_mean_discrete_offset_multiplier <-
+					conditional_mean_discrete_offset_multiplier
+				if(validate_level > 1) {
+					warning("did not check that provided conditional_mean_discrete_offset_multiplier agrees with sigma/precision")
+				}
+			}
+		}
+	} else if(length(discrete_vars) > 0) {
+		## only discrete variables -- we only need conditional_sigma_discrete,
+		## not sigma_continuous or conditional_mean_discrete_offset_multiplier
+		if(missing(conditional_sigma_discrete)) {
+			if(!missing(sigma)) {
+				validated_params$conditional_sigma_discrete <- sigma
+			} else {
+				validated_params$conditional_sigma_discrete <- solve(precision)
+			}
+		} else {
+			validated_params$conditional_sigma_discrete <- conditional_sigma_discrete
+			if(validate_level > 1) {
+				warning("did not check that provided conditional_sigma_discrete agrees with sigma/precision")
+			}
+		}
+	}
+	
+	
 	## Return
 	return(list(x = x,
 	 mean = mean,
@@ -430,4 +556,12 @@ compute_trunc_const_pdtmvn <- function(mean, sigma, precision, lower, upper) {
 
 floor_x_minus_1 <- function(x) {
 	return(floor(x) - 1)
+}
+
+calc_Schur_complement <- function(X, inds) {
+	X_1 <- precision[continuous_vars, continuous_vars, drop=FALSE]
+	X_12 <- precision[continuous_vars, discrete_vars, drop=FALSE]
+	X_2 <- precision[discrete_vars, discrete_vars, drop=FALSE]
+	
+	return(solve(X_1 - X_12 %*% solve(X_2) %*% t(X_12)))
 }
