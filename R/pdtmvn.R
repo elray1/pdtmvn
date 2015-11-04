@@ -29,8 +29,8 @@
 #'   multivariate normal distribution for the discrete variables conditioning on
 #'   the continuous variables.  Providing this saves a small amount of
 #'   computation time.
-#' @param continous_vars Vector containing either column names or column
-#'   indices for continous variables.
+#' @param continuous_vars Vector containing either column names or column
+#'   indices for continuous variables.
 #' @param discrete_vars Vector containing either column names or column indices
 #'   for discrete variables.
 #' @param discrete_var_range_functions a list with one entry for each element
@@ -45,8 +45,8 @@
 #' 
 #' @return Density of pdTMVN distribution evaluated at x
 dpdtmvn <- function(x,
-		mean = rep(0, nrow(sigma)),
-		sigma = diag(length(mean)),
+		mean,
+		sigma,
 		precision,
 		lower = rep(-Inf, length = length(mean)),
 		upper = rep(Inf, length = length(mean)),
@@ -55,8 +55,8 @@ dpdtmvn <- function(x,
 		sigma_continuous,
 		conditional_sigma_discrete,
 		conditional_mean_discrete_offset_multiplier,
-		continuous_vars = seq_along(mean),
-		discrete_vars = NULL,
+		continuous_vars,
+		discrete_vars,
 		discrete_var_range_functions = sapply(seq_along(discrete_vars), function(dv) {
 			c("floor_x_minus_1", "floor")
 		}),
@@ -100,7 +100,7 @@ dpdtmvn <- function(x,
 		rm("validated_params")
 	}
 	
-	## The outline for the rest of the code here is closely based on that in the
+	## The rest of the code here is closely based on that in the
 	## tmvtnorm package, but we
 	##  - do the integration for partial discretization
 	##  - allow for precomputation of trunc_const
@@ -115,7 +115,7 @@ dpdtmvn <- function(x,
 	
 	## truncation limits
 	in_truncation_support <- which(apply(x, 1, function(x_row) {
-		all(x[i, ] >= lower & x[i, ] <= upper & !any(is.infinite(x)))
+		all(x_row >= lower & x_row <= upper & !any(is.infinite(x_row)))
 	}))
 	
 	## discrete distribution domain
@@ -151,7 +151,7 @@ dpdtmvn <- function(x,
 	if(length(continuous_vars) > 0) {
 		log_result[in_support] <- dmvnorm(x[in_support, continuous_vars, drop=FALSE],
 			mean = mean[continuous_vars],
-			sigma = sigma_continuous_vars,
+			sigma = sigma_continuous,
 			log = TRUE)
 	}
 	
@@ -252,8 +252,8 @@ dpdtmvn <- function(x,
 #'   multivariate normal distribution for the discrete variables conditioning on
 #'   the continuous variables.  Providing this saves a small amount of
 #'   computation time.
-#' @param continous_vars Vector containing either column names or column indices for
-#'   continous variables.
+#' @param continuous_vars Vector containing either column names or column indices for
+#'   continuous variables.
 #' @param discrete_vars Vector containing either column names or column indices for
 #'   discrete variables.
 #' @param validate_level Numeric; if <= 1, validation is performed, but warnings
@@ -300,6 +300,8 @@ validate_params_pdtmvn <- function(x,
 			stop("mean parameter must be a numeric vector with the same length as the number of covariates in x.")
 		}
 		validated_params$mean <- mean
+	} else {
+		validated_params$mean <- rep(0, nrow(sigma))
 	}
 	
 	
@@ -330,7 +332,7 @@ validate_params_pdtmvn <- function(x,
 		}
 	}
 	if(missing(sigma) && missing(precision)) {
-		validated_params$sigma <- sigma ## fill with default value
+		validated_params$sigma <- rep(0, nrow(sigma)) ## fill with default value
 	}
 	
 	
@@ -376,13 +378,13 @@ validate_params_pdtmvn <- function(x,
 	validated_params$trunc_const <- trunc_const
 	
 	
-	## Validate continous and discrete_vars.  We do the following:
+	## Validate continuous and discrete_vars.  We do the following:
 	##  1) convert character vectors to numeric.
 	##  2) (a) If both were specified, make sure they form a partition of the
 	##     column indices of x
 	##     (b) If only one was specified, set the other to its complement
 	if(!missing(continuous_vars)) {
-		if(is.character(continous_vars)) {
+		if(is.character(continuous_vars)) {
 			continuous_vars <- which(colnames(x) %in% continuous_vars)
 		} else if(is.numeric(continuous_vars)) {
 			continuous_vars <- as.integer(continuous_vars)
@@ -416,7 +418,7 @@ validate_params_pdtmvn <- function(x,
 		## If discrete_vars is non-missing, override the default value of
 		## continuous_vars specified in the function header to set continuous_vars
 		## equal to the complement of discrete_vars.
-		## Otherwise, if discrete_vars is also missing, do nothing.
+		## Otherwise, if discrete_vars is also missing, set all vars to continuous.
 		
 		## Initial check of data type for discrete_vars if it was provided.
 		if(!missing(discrete_vars)) {
@@ -430,6 +432,9 @@ validate_params_pdtmvn <- function(x,
 			
 			## Set continuous_vars to the complement of discrete_vars.
 			continuous_vars <- which(!(seq_len(ncol(x)) %in% discrete_vars))
+		} else {
+			continuous_vars <- seq_len(ncol(x))
+			discrete_vars <- integer(0)
 		}
 	}
 
@@ -445,7 +450,7 @@ validate_params_pdtmvn <- function(x,
 	## conditional_mean_discrete_offset_multiplier if they are missing
 	## if they are provided, these parameter values are not validated
 	if(length(continuous_vars) > 0) {
-		## Get sigma_continous
+		## Get sigma_continuous
 		if(missing(sigma_continuous)) {
 			if("sigma" %in% names(validated_params)) {
 				## sigma_continuous is a subset of sigma
@@ -525,18 +530,8 @@ validate_params_pdtmvn <- function(x,
 		}
 	}
 	
-	
 	## Return
-	return(list(x = x,
-	 mean = mean,
-	 sigma = sigma,
-	 precision = precision,
-	 lower = lower,
-	 upper = upper,
-	 norm_const = norm_const,
-	 trunc_const = trunc_const,
-	 continuous_vars = continuous_vars,
-	 discrete_vars = discrete_vars))
+	return(validated_params)
 }
 
 
@@ -548,7 +543,9 @@ compute_trunc_const_pdtmvn <- function(mean, sigma, precision, lower, upper) {
 	## Ideally, we would like pmvnorm to support a log=TRUE argument to give us
 	## more numerical precision in high dimensional cases.  Here we compute the
 	## probability and then take its logarithm.
-	exp_trunc_const <- pmvnorm(lower=lower, upper=upper, mean=mean, sigma=sigma)
+	exp_trunc_const <- as.numeric(
+		pmvnorm(lower=lower, upper=upper, mean=mean, sigma=sigma)
+	)
 	
 	return(log(exp_trunc_const))
 }
