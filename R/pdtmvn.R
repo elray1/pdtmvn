@@ -114,9 +114,9 @@ dpdtmvn <- function(x,
 	##      distribution for that covariate places positive mass.
 	
 	## truncation limits
-	in_truncation_support <- which(apply(x, 1, function(x_row) {
+	in_truncation_support <- apply(x, 1, function(x_row) {
 		all(x_row >= lower & x_row <= upper & !any(is.infinite(x_row)))
-	}))
+	})
 	
 	## discrete distribution domain
 	if(length(discrete_vars) > 0) {
