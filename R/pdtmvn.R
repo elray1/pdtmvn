@@ -124,11 +124,16 @@ dpdtmvn <- function(x,
 		## time here -- but for now, I expect such values to be rare.
 		
 		## the vector b_x for each row of x
-		b_x_discrete <- sapply(seq_along(discrete_vars), function(discrete_var_ind) {
-			do.call(discrete_var_range_functions[[discrete_var_ind]][[2]],
+		b_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
+			do.call(discrete_var_range_functions[[discrete_var_ind]][["b"]],
 				list(x=x[, discrete_vars[discrete_var_ind]])
 			)
 		})
+		if(identical(length(discrete_vars), 1L)) {
+			b_x_discrete <- matrix(b_x_discrete)
+		} else {
+			b_x_discrete <- t(b_x_discrete)
+		}
 		
 		## logical vector of length nrow(x) with whether all entries corresponding to
 		## discrete variables in row i of x agree with all entries of row i of
@@ -148,7 +153,7 @@ dpdtmvn <- function(x,
 	log_result <- rep(-Inf, nrow(x))
 	
 	## Compute contribution from observations of continuous variables
-	if(length(continuous_vars) > 0) {
+	if(length(continuous_vars) > 0 && length(in_support) > 0) {
 		log_result[in_support] <- dmvnorm(x[in_support, continuous_vars, drop=FALSE],
 			mean = mean[continuous_vars],
 			sigma = sigma_continuous,
@@ -156,10 +161,10 @@ dpdtmvn <- function(x,
 	}
 	
 	## Compute contribution from observations of discrete variables
-	if(length(discrete_vars) > 0) {
+	if(length(discrete_vars) > 0 && length(in_support) > 0) {
 		## get conditional means of discrete vars given continuous vars
-		cond_means <- matrix(rep(mean[discrete_vars], nrow(x)),
-			nrow=nrow(x),
+		cond_means <- matrix(rep(mean[discrete_vars], length(in_support)),
+			nrow=length(in_support),
 			byrow=TRUE)
 		
 		if(length(continuous_vars) > 0) {
@@ -176,37 +181,59 @@ dpdtmvn <- function(x,
 		}
 		
 		## get lower bounds on integration for each discrete observation
-		a_x_discrete <- sapply(seq_along(discrete_vars), function(discrete_var_ind) {
-			do.call(discrete_var_range_functions[[discrete_var_ind]][[1]],
-							list(x=x[in_support, discrete_vars[discrete_var_ind]])
+		a_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
+			do.call(discrete_var_range_functions[[discrete_var_ind]][["a"]],
+				list(x=x[in_support, discrete_vars[discrete_var_ind]])
 			)
 		})
+		if(identical(length(discrete_vars), 1L)) {
+			a_x_discrete <- matrix(a_x_discrete)
+		} else {
+			a_x_discrete <- t(a_x_discrete)
+		}
+
 		
 		## we computed b_x earlier for all x -- subset here for those x in support
 		b_x_discrete <- b_x_discrete[in_support, , drop=FALSE]
 		
 		if(identical(length(discrete_vars), 1L)) {
-			p_lt_b <- pnorm(b_x_discrete[in_support, discrete_vars],
+			p_lt_b <- pnorm(b_x_discrete[, discrete_vars],
 				mean = as.vector(cond_means),
-				sd = sqrt(as.vector(conditional_sigma_discrete)))
+				sd = sqrt(as.vector(conditional_sigma_discrete)),
+				log = TRUE)
 			
-			p_lt_a <- pnorm(a_x_discrete[in_support, discrete_vars],
+			p_lt_a <- pnorm(a_x_discrete[, discrete_vars],
 				mean = as.vector(cond_means),
-				sd = sqrt(as.vector(conditional_sigma_discrete)))
+				sd = sqrt(as.vector(conditional_sigma_discrete)),
+				log = TRUE)
 			
-			log_result[in_support] <- log_result[in_support] +
-				logspace_sub(p_lt_b, p_lt_a)
+			if(length(continuous_vars) > 0) {
+				log_result[in_support] <- log_result[in_support] +
+					logspace_sub(p_lt_b, p_lt_a)
+			} else {
+				log_result[in_support] <- logspace_sub(p_lt_b, p_lt_a)
+			}
 		} else {
 			stop("dpdtmvn does not currently support discrete_vars with length > 1")
 			## pmvnorm does not support a log=TRUE option; I suspect that we need that
 			## for the probabilities to be non-zero.
-			log_result[in_support] <- log_result[in_support] +
-				apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
-					pmvnorm(lower=a_x_discrete[support_row_ind, ],
-									upper=b_x_discrete[support_row_ind, ],
-									mean=mean[discrete_vars],
-									sigma=conditional_sigma_discrete)
-				})
+			if(length(continuous_vars) > 0) {
+				log_result[in_support] <- log_result[in_support] +
+					apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
+						pmvnorm(lower=a_x_discrete[support_row_ind, ],
+										upper=b_x_discrete[support_row_ind, ],
+										mean=mean[discrete_vars],
+										sigma=conditional_sigma_discrete)
+					})
+			} else {
+				log_result[in_support] <- 
+					apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
+						pmvnorm(lower=a_x_discrete[support_row_ind, ],
+										upper=b_x_discrete[support_row_ind, ],
+										mean=mean[discrete_vars],
+										sigma=conditional_sigma_discrete)
+					})
+			}
 		}
 	}
 	
