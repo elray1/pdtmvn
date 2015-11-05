@@ -3,7 +3,7 @@
 
 \documentclass[fleqn]{article}
 
-\usepackage{geometry} 
+\usepackage{geometry}
 \geometry{letterpaper, top=1.5cm, left=2cm, right=2cm}
 
 \usepackage{amssymb, amsmath, amsfonts}
@@ -14,9 +14,8 @@
 \newcommand{\pdf}{{p.d.f.} }
 \newcommand{\ind}{\mathbb{I}}
 
-\usepackage{Sweave}
 \begin{document}
-\input{pdtmvn-concordance}
+\SweaveOpts{concordance=TRUE}
 
 \section{Introduction}
 \label{sec:intro}
