@@ -154,7 +154,7 @@ dpdtmvn <- function(x,
 	
 	## Compute contribution from observations of continuous variables
 	if(length(continuous_vars) > 0 && length(in_support) > 0) {
-		log_result[in_support] <- dmvnorm(x[in_support, continuous_vars, drop=FALSE],
+		log_result[in_support] <- mvtnorm::dmvnorm(x[in_support, continuous_vars, drop=FALSE],
 			mean = mean[continuous_vars],
 			sigma = sigma_continuous,
 			log = TRUE)
@@ -220,7 +220,7 @@ dpdtmvn <- function(x,
 			if(length(continuous_vars) > 0) {
 				log_result[in_support] <- log_result[in_support] +
 					apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
-						pmvnorm(lower=a_x_discrete[support_row_ind, ],
+						mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
 										upper=b_x_discrete[support_row_ind, ],
 										mean=mean[discrete_vars],
 										sigma=conditional_sigma_discrete)
@@ -228,7 +228,7 @@ dpdtmvn <- function(x,
 			} else {
 				log_result[in_support] <- 
 					apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
-						pmvnorm(lower=a_x_discrete[support_row_ind, ],
+						mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
 										upper=b_x_discrete[support_row_ind, ],
 										mean=mean[discrete_vars],
 										sigma=conditional_sigma_discrete)
@@ -571,7 +571,7 @@ compute_trunc_const_pdtmvn <- function(mean, sigma, precision, lower, upper) {
 	## more numerical precision in high dimensional cases.  Here we compute the
 	## probability and then take its logarithm.
 	exp_trunc_const <- as.numeric(
-		pmvnorm(lower=lower, upper=upper, mean=mean, sigma=sigma)
+		mvtnorm::pmvnorm(lower=lower, upper=upper, mean=mean, sigma=sigma)
 	)
 	
 	return(log(exp_trunc_const))

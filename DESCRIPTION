@@ -4,7 +4,7 @@ Version: 0.0.0.9000
 Authors@R: person("Evan", "Ray", email = "elray@umass.edu", role = c("aut", "cre"))
 Description: Sampling, density, distribution, and quantile functions for the partially discretized truncated multivariate normal distribution
 Depends: R (>= 3.2.2)
-Imports: plyr
+Imports: plyr, mvtnorm
 License: What license is it under?
 LazyData: true
 Suggests: knitr
