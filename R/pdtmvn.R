@@ -197,12 +197,12 @@ dpdtmvn <- function(x,
 		b_x_discrete <- b_x_discrete[in_support, , drop=FALSE]
 		
 		if(identical(length(discrete_vars), 1L)) {
-			p_lt_b <- pnorm(b_x_discrete[, discrete_vars],
+			p_lt_b <- pnorm(b_x_discrete[, 1],
 				mean = as.vector(cond_means),
 				sd = sqrt(as.vector(conditional_sigma_discrete)),
 				log = TRUE)
 			
-			p_lt_a <- pnorm(a_x_discrete[, discrete_vars],
+			p_lt_a <- pnorm(a_x_discrete[, 1],
 				mean = as.vector(cond_means),
 				sd = sqrt(as.vector(conditional_sigma_discrete)),
 				log = TRUE)
@@ -488,8 +488,8 @@ validate_params_pdtmvn <- function(x,
 				if(identical(length(discrete_vars), 0L)) {
 					validated_params$sigma_continuous <- solve(precision)
 				} else {
-					validated_params$sigma_continuous <- calc_Schur_complement(precision,
-						continuous_vars)
+					validated_params$sigma_continuous <- solve(calc_Schur_complement(precision,
+						continuous_vars))
 				}
 			}
 		} else {
@@ -524,7 +524,7 @@ validate_params_pdtmvn <- function(x,
 					sigma_dc <- sigma[discrete_vars, continuous_vars, drop=FALSE]
 					
 					validated_params$conditional_mean_discrete_offset_multiplier <-
-						sigma_dc * solve(validated_params$sigma_continuous)
+						sigma_dc %*% solve(validated_params$sigma_continuous)
 				} else {
 					precision_d <- precision[discrete_vars, discrete_vars, drop=FALSE]
 					precision_dc <- precision[discrete_vars, continuous_vars, drop=FALSE]
@@ -582,10 +582,23 @@ floor_x_minus_1 <- function(x) {
 	return(floor(x) - 1)
 }
 
+#' Calculate the Schur complement of the block of X specified by inds
+#' There might be a more numerically stable way to do this.
+#' 
+#' @param X A square matrix
+#' @param inds Indices specifying the rows/columns of the block within X
+#'   to compute the Schur complement of.
+#'   
+#' @return The Schur complement of the submatrix of X specified by inds:
+#'   A - B D^{-1} C, where A is the submatrix of X specified by inds,
+#'   B is the submatrix with rows given by inds and columns not in inds,
+#'   C is the submatrix with columns given by inds and rows not in inds,
+#'   and D is the submatrix with rows and columns not in inds.
 calc_Schur_complement <- function(X, inds) {
-	X_1 <- precision[continuous_vars, continuous_vars, drop=FALSE]
-	X_12 <- precision[continuous_vars, discrete_vars, drop=FALSE]
-	X_2 <- precision[discrete_vars, discrete_vars, drop=FALSE]
+	inds_complement <- which(!(seq_len(ncol(X)) %in% inds))
+	X_1 <- X[inds, inds, drop=FALSE]
+	X_12 <- X[inds, inds_complement, drop=FALSE]
+	X_2 <- X[inds_complement, inds_complement, drop=FALSE]
 	
-	return(solve(X_1 - X_12 %*% solve(X_2) %*% t(X_12)))
+	return(X_1 - X_12 %*% solve(X_2) %*% t(X_12))
 }
