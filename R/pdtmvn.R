@@ -363,7 +363,7 @@ validate_params_pdtmvn <- function(x,
 	}
 	
 	
-  ## Validate lower and upper bounds
+    ## Validate lower and upper bounds
 	if(!missing(lower)) {
 		if(!is.numeric(lower) || !identical(length(lower), ncol(x))) {
 			stop("lower parameter must be a numeric vector with the same length as the number of covariates in x.")
@@ -476,92 +476,169 @@ validate_params_pdtmvn <- function(x,
 	## fill in values for sigma_continuous, conditional_sigma_discrete, and
 	## conditional_mean_discrete_offset_multiplier if they are missing
 	## if they are provided, these parameter values are not validated
-	if(length(continuous_vars) > 0) {
-		## Get sigma_continuous
-		if(missing(sigma_continuous)) {
-			if("sigma" %in% names(validated_params)) {
-				## sigma_continuous is a subset of sigma
-				validated_params$sigma_continuous <- 
-					sigma[continuous_vars, continuous_vars, drop=FALSE]
-			} else {
-				## sigma_continuous can be calculated from precision
-				if(identical(length(discrete_vars), 0L)) {
-					validated_params$sigma_continuous <- solve(precision)
-				} else {
-					validated_params$sigma_continuous <- solve(calc_Schur_complement(precision,
-						continuous_vars))
-				}
-			}
-		} else {
-			validated_params$sigma_continuous <- sigma_continuous
-			if(validate_level > 1) {
-				warning("did not check that provided sigma_continuous agrees with sigma/precision")
-			}
-		}
-		
-		## if there are both continuous and discrete variables, get
-		## conditional_sigma_discrete and conditional_mean_discrete_offset_multiplier
-		if(length(discrete_vars) > 0) {
-			## Get conditional_sigma_discrete
-			if(missing(conditional_sigma_discrete)) {
-				if(!missing(precision)) {
-					precision_d <- precision[discrete_vars, discrete_vars, drop=FALSE]
-					validated_params$conditional_sigma_discrete <- solve(precision_d)
-				} else {
-					validated_params$conditional_sigma_discrete <- 
-						calc_Schur_complement(validated_params$sigma, discrete_vars)
-				}
-			} else {
-				validated_params$conditional_sigma_discrete <- conditional_sigma_discrete
-				if(validate_level > 1) {
-					warning("did not check that provided conditional_sigma_discrete agrees with sigma/precision")
-				}
-			}
-			
-			## Get conditional_mean_discrete_offset_multiplier
-			if(missing(conditional_mean_discrete_offset_multiplier)) {
-				if(!missing(sigma)) {
-					sigma_dc <- sigma[discrete_vars, continuous_vars, drop=FALSE]
-					
-					validated_params$conditional_mean_discrete_offset_multiplier <-
-						sigma_dc %*% solve(validated_params$sigma_continuous)
-				} else {
-					precision_d <- precision[discrete_vars, discrete_vars, drop=FALSE]
-					precision_dc <- precision[discrete_vars, continuous_vars, drop=FALSE]
-
-					validated_params$conditional_mean_discrete_offset_multiplier <-
-						-1 * solve(precision_d) %*% precision_dc
-				}
-			} else {
-				validated_params$conditional_mean_discrete_offset_multiplier <-
-					conditional_mean_discrete_offset_multiplier
-				if(validate_level > 1) {
-					warning("did not check that provided conditional_mean_discrete_offset_multiplier agrees with sigma/precision")
-				}
-			}
-		}
-	} else if(length(discrete_vars) > 0) {
-		## only discrete variables -- we only need conditional_sigma_discrete,
-		## not sigma_continuous or conditional_mean_discrete_offset_multiplier
-		if(missing(conditional_sigma_discrete)) {
-			if(!missing(sigma)) {
-				validated_params$conditional_sigma_discrete <- sigma
-			} else {
-				validated_params$conditional_sigma_discrete <- solve(precision)
-			}
-		} else {
-			validated_params$conditional_sigma_discrete <- conditional_sigma_discrete
-			if(validate_level > 1) {
-				warning("did not check that provided conditional_sigma_discrete agrees with sigma/precision")
-			}
-		}
-	}
+    validated_params <- c(validated_params,
+        compute_sigma_subcomponents(sigma = validated_params$sigma,
+            precision = validated_params$precision,
+            continuous_vars = continuous_vars,
+            discrete_vars = discrete_vars,
+            sigma_continuous = sigma_continuous,
+            conditional_sigma_discrete = conditional_sigma_discrete,
+            conditional_mean_discrete_offset_multiplier = 
+                conditional_mean_discrete_offset_multiplier,
+            validate_level = validate_level))
 	
 	## Return
 	return(validated_params)
 }
 
+#' Compute sigma_continuous, conditional_sigma_discrete, and
+#' conditional_mean_discrete_offset_multiplier from sigma and/or precision.
+#' These quantities are used in computation of the pdtmvn density.
+#' 
+#' @param sigma the covariance matrix parameter for the pdtmvn distribution
+#' @param precision the precision (inverse covariance) matrix parameter for the
+#'     pdtmvn distribution
+#' @param continuous_vars integer vector with indices of sigma/precision that
+#'     correspond to continuous variables in the pdtmvn distribution.
+#' @param discrete_vars integer vector with indices of sigma/precision that
+#'     correspond to discrete variables in the pdtmvn distribution.
+#' @param sigma_continuous (optional) this matrix may be provided.  If it is,
+#'     the provided value will be included in the return value; the value will
+#'     not be validated.
+#' @param conditional_sigma_discrete (optional) this matrix may be provided.  If
+#'     it is, the provided value will be included in the return value; the value
+#'     will not be validated.
+#' @param conditional_mean_discrete_offset_multiplier (optional) this matrix may
+#'     be provided.  If it is, the provided value will be included in the return
+#'     value; the value will not be validated.
+#' @param validate_level Numeric; if <= 1, validation is performed, but warnings
+#'   about things that were not checked are not issued.  If 2, validation is
+#'   performed and warnings about things that were not checked are issued.
+#'     
+#' @return a named list with three components: sigma_continuous,
+#'     conditional_sigma_discrete, and
+#'     conditional_mean_discrete_offset_multiplier
+compute_sigma_subcomponents <- function(sigma = NULL,
+    precision = NULL,
+    continuous_vars,
+    discrete_vars,
+    sigma_continuous,
+    conditional_sigma_discrete,
+    conditional_mean_discrete_offset_multiplier,
+    validate_level) {
+    if(is.null(sigma) && is.null(precision)) {
+        stop("At least one of sigma and precision must be provided.")
+    }
+    
+    sigma_subcomponents <- list()
+    
+    if(length(continuous_vars) > 0) {
+        ## Get sigma_continuous
+        if(missing(sigma_continuous)) {
+            if(!is.null(sigma)) {
+                ## sigma_continuous is a subset of sigma
+                sigma_subcomponents$sigma_continuous <- 
+                    sigma[continuous_vars, continuous_vars, drop=FALSE]
+            } else {
+                ## sigma_continuous can be calculated from precision
+                if(identical(length(discrete_vars), 0L)) {
+                    sigma_subcomponents$sigma_continuous <- solve(precision)
+                } else {
+                    sigma_subcomponents$sigma_continuous <- 
+                        solve(calc_Schur_complement(precision, continuous_vars))
+                }
+            }
+        } else {
+            sigma_subcomponents$sigma_continuous <- sigma_continuous
+            if(validate_level > 1) {
+                warning("did not check that provided sigma_continuous agrees with sigma/precision")
+            }
+        }
+        
+        ## if there are both continuous and discrete variables, get
+        ## conditional_sigma_discrete and conditional_mean_discrete_offset_multiplier
+        if(length(discrete_vars) > 0) {
+            ## Get conditional_sigma_discrete
+            if(missing(conditional_sigma_discrete)) {
+                if(!is.null(precision)) {
+                    precision_d <- precision[discrete_vars, discrete_vars,
+                        drop=FALSE]
+                    sigma_subcomponents$conditional_sigma_discrete <-
+                        solve(precision_d)
+                } else {
+                    sigma_subcomponents$conditional_sigma_discrete <- 
+                        calc_Schur_complement(sigma, discrete_vars)
+                }
+            } else {
+                sigma_subcomponents$conditional_sigma_discrete <-
+                    conditional_sigma_discrete
+                if(validate_level > 1) {
+                    warning("did not check that provided conditional_sigma_discrete agrees with sigma/precision")
+                }
+            }
+            
+            ## Get conditional_mean_discrete_offset_multiplier
+            if(missing(conditional_mean_discrete_offset_multiplier)) {
+                if(!is.null(sigma)) {
+                    sigma_dc <- sigma[discrete_vars, continuous_vars,
+                        drop=FALSE]
+                    
+                    sigma_subcomponents$conditional_mean_discrete_offset_multiplier <-
+                        sigma_dc %*% solve(sigma_subcomponents$sigma_continuous)
+                } else {
+                    precision_d <- precision[discrete_vars, discrete_vars,
+                        drop=FALSE]
+                    precision_dc <- precision[discrete_vars, continuous_vars,
+                        drop=FALSE]
+                    
+                    sigma_subcomponents$conditional_mean_discrete_offset_multiplier <-
+                        -1 * solve(precision_d) %*% precision_dc
+                }
+            } else {
+                sigma_subcomponents$conditional_mean_discrete_offset_multiplier <-
+                    conditional_mean_discrete_offset_multiplier
+                if(validate_level > 1) {
+                    warning("did not check that provided conditional_mean_discrete_offset_multiplier agrees with sigma/precision")
+                }
+            }
+        }
+    } else if(length(discrete_vars) > 0) {
+        ## only discrete variables -- we only need conditional_sigma_discrete,
+        ## not sigma_continuous or conditional_mean_discrete_offset_multiplier
+        if(missing(conditional_sigma_discrete)) {
+            if(!is.null(sigma)) {
+                sigma_subcomponents$conditional_sigma_discrete <- sigma
+            } else {
+                sigma_subcomponents$conditional_sigma_discrete <-
+                    solve(precision)
+            }
+        } else {
+            sigma_subcomponents$conditional_sigma_discrete <-
+                conditional_sigma_discrete
+            if(validate_level > 1) {
+                warning("did not check that provided conditional_sigma_discrete agrees with sigma/precision")
+            }
+        }
+    }
+    
+    return(sigma_subcomponents)
+}
 
+
+#' Compute the (log of the) constant term in the truncated multivariate normal
+#' pdf that accounts for truncation:  the integral of the mvn pdf between the
+#' lower and upper limits
+#' 
+#' @param mean mean of the truncated multivariate normal distribution
+#' @param sigma covariance matrix for the truncated multivaraite normal
+#'     distribution
+#' @param precision precision (inverse covariance) matrix for the truncated
+#'     multivariate normal distribution
+#' @param lower lower truncation endpoints
+#' @param upper upper truncation endpoints
+#' 
+#' @return log of the the integral of the mvn pdf between the
+#'     lower and upper limits
 compute_trunc_const_pdtmvn <- function(mean, sigma, precision, lower, upper) {
 	if(missing(sigma)) {
 		sigma <- solve(precision)
@@ -577,7 +654,11 @@ compute_trunc_const_pdtmvn <- function(mean, sigma, precision, lower, upper) {
 	return(log(exp_trunc_const))
 }
 
-
+#' Compute floor(x) - 1
+#' 
+#' @param x numeric
+#' 
+#' @return floor(x) - 1
 floor_x_minus_1 <- function(x) {
 	return(floor(x) - 1)
 }
