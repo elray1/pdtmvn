@@ -34,9 +34,13 @@
 #' @param discrete_vars Vector containing either column names or column indices
 #'   for discrete variables.
 #' @param discrete_var_range_functions a list with one entry for each element
-#'   of discrete_vars.  Each entry is a character vector of length 2; the first
-#'   element is the name of a function that returns a(x) for any real x, and
-#'   the second is the name of a function that returns b(x) for any real x.
+#'   of discrete_vars.  Each entry is a named list of length 3; the element
+#'   named "a" is a character string with the name of a function that returns
+#'   a(x) for any real x, the element named "b" is a character string with the
+#'   name of a function that returns b(x) for any real x, and the element named
+#'   "in_range" is a character string with the name of a function that returns a
+#'   logical, TRUE if x is in the support of the corresponding discrete variable
+#'   and FALSE otherwise.
 #' @param log Logical; if TRUE, return value is log(density).
 #' @param validate_level Numeric; if 0, no validation is performed (risky!).
 #'   If 1, parameters are validated but warnings about checks not performed are
@@ -57,8 +61,8 @@ dpdtmvn <- function(x,
 		conditional_mean_discrete_offset_multiplier,
 		continuous_vars,
 		discrete_vars,
-		discrete_var_range_functions = sapply(seq_along(discrete_vars), function(dv) {
-			c("floor_x_minus_1", "floor")
+		discrete_var_range_functions = lapply(seq_along(discrete_vars), function(dv) {
+			list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer")
 		}),
 		log = FALSE,
 		validate_level = TRUE) {
@@ -136,12 +140,15 @@ dpdtmvn <- function(x,
 		}
 		
 		## logical vector of length nrow(x) with whether all entries corresponding to
-		## discrete variables in row i of x agree with all entries of row i of
-		## b_x_discrete
-		in_discrete_dist_domain <- sapply(seq_len(nrow(x)),
-			function(x_row_ind) {
-				isTRUE(all.equal(b_x_discrete[x_row_ind], x[x_row_ind, discrete_vars]))
-			})
+		## discrete variables in row i of x are in their domains
+		in_discrete_dist_domain <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
+		    do.call(discrete_var_range_functions[[discrete_var_ind]][["in_range"]],
+		        list(x=x[, discrete_vars[discrete_var_ind]])
+		    )
+		})
+		if(length(discrete_vars) > 1L) {
+		    in_discrete_dist_domain <- apply(t(in_discrete_dist_domain), 1, all)
+		}
 	} else {
 		in_discrete_dist_domain <- rep(TRUE, nrow(x))
 	}
@@ -654,7 +661,22 @@ compute_trunc_const_pdtmvn <- function(mean, sigma, precision, lower, upper) {
 	return(log(exp_trunc_const))
 }
 
+#' Compute whether each element of x is equal to an integer, up to a specified
+#' tolerance level.
+#' 
+#' @param x numeric
+#' @param tolerance numeric tolerance for comparison of integer values
+#' 
+#' @return logical vector of same length as x; entry i is TRUE if
+#'     x[i] is within tol of as.integer(x[i])
+equals_integer <- function(x, tolerance = .Machine$double.eps ^ 0.5) {
+    return(sapply(x, function(x_i) {
+        return(isTRUE(all.equal(x_i, as.integer(x_i))))
+    }))
+}
+
 #' Compute floor(x) - 1
+#' Used as default "a" function
 #' 
 #' @param x numeric
 #' 

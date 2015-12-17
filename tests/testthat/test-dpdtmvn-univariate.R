@@ -172,7 +172,7 @@ test_that("dpdtmvn works -- 0 continuous, 1 discrete, no truncation, sigma, some
 		lower = -Inf,
 		upper = Inf,
 		discrete_vars = 1,
-		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor")),
+		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer")),
 		log = TRUE,
 		validate_level = 1)
 	
@@ -189,7 +189,7 @@ test_that("dpdtmvn works -- 0 continuous, 1 discrete, no truncation, sigma, some
 		lower = -Inf,
 		upper = Inf,
 		discrete_vars = 1,
-		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor")),
+		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer")),
 		log = FALSE,
 		validate_level = 1)
 	
@@ -210,7 +210,7 @@ test_that("dpdtmvn works -- 0 continuous, 1 discrete, no truncation, precision, 
 		lower = -Inf,
 		upper = Inf,
 		discrete_vars = 1,
-		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor")),
+		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer")),
 		log = TRUE,
 		validate_level = 1)
 	
@@ -227,7 +227,7 @@ test_that("dpdtmvn works -- 0 continuous, 1 discrete, no truncation, precision, 
 		lower = -Inf,
 		upper = Inf,
 		discrete_vars = 1,
-		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor")),
+		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer")),
 		log = FALSE,
 		validate_level = 1)
 	
@@ -250,7 +250,7 @@ test_that("dpdtmvn works -- 0 continuous, 1 discrete, truncation, sigma, some va
 		lower = -0.5,
 		upper = 1,
 		discrete_vars = 1,
-		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor")),
+		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer")),
 		log = TRUE,
 		validate_level = 1)
 	
@@ -272,7 +272,7 @@ test_that("dpdtmvn works -- 0 continuous, 1 discrete, truncation, sigma, some va
 		lower = -0.5,
 		upper = 1,
 		discrete_vars = 1,
-		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor")),
+		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer")),
 		log = FALSE,
 		validate_level = 1)
 	
@@ -295,7 +295,7 @@ test_that("dpdtmvn works -- 0 continuous, 1 discrete, truncation, precision, som
 		lower = -0.5,
 		upper = 1,
 		discrete_vars = 1,
-		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor")),
+		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer")),
 		log = TRUE,
 		validate_level = 1)
 	
@@ -317,7 +317,7 @@ test_that("dpdtmvn works -- 0 continuous, 1 discrete, truncation, precision, som
 		lower = -0.5,
 		upper = 1,
 		discrete_vars = 1,
-		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor")),
+		discrete_var_range_functions = list(list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer")),
 		log = FALSE,
 		validate_level = 1)
 	
