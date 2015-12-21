@@ -417,7 +417,7 @@ validate_params_pdtmvn <- function(x,
 	##  2) (a) If both were specified, make sure they form a partition of the
 	##     column indices of x
 	##     (b) If only one was specified, set the other to its complement
-	if(!missing(continuous_vars)) {
+	if(!missing(continuous_vars) && !is.null(continuous_vars) && length(continuous_vars) > 0) {
 		if(is.character(continuous_vars)) {
 			continuous_vars <- which(colnames(x) %in% continuous_vars)
 		} else if(is.numeric(continuous_vars)) {
@@ -427,13 +427,13 @@ validate_params_pdtmvn <- function(x,
 		}
 		
 		## Initial check of data type for discrete_vars if it was provided.
-		if(!missing(discrete_vars)) {
+		if(!missing(discrete_vars) && !is.null(discrete_vars) && length(discrete_vars) > 0) {
 			if(is.character(discrete_vars)) {
 				discrete_vars <- which(colnames(x) %in% discrete_vars)
 			} else if(is.numeric(discrete_vars)) {
 				discrete_vars <- as.integer(discrete_vars)
 			} else {
-				stop("continuous_vars parameter must be a character or numeric vector.")
+				stop("discrete_vars parameter must be a character or numeric vector.")
 			}
 			
 			## Both continuous_vars and discrete_vars were specified;
@@ -455,7 +455,7 @@ validate_params_pdtmvn <- function(x,
 		## Otherwise, if discrete_vars is also missing, set all vars to continuous.
 		
 		## Initial check of data type for discrete_vars if it was provided.
-		if(!missing(discrete_vars)) {
+		if(!missing(discrete_vars) && !is.null(discrete_vars) && length(discrete_vars) > 0) {
 			if(is.character(discrete_vars)) {
 				discrete_vars <- which(colnames(x) %in% discrete_vars)
 			} else if(is.numeric(discrete_vars)) {
