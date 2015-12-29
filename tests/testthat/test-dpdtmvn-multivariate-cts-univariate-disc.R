@@ -2,6 +2,8 @@ library(pdtmvn)
 library(mvtnorm)
 library(tmvtnorm)
 
+context("dpdtmvn -- multivariate")
+
 ################################################################################
 ## Tests with upper integration limit = point
 ################################################################################
@@ -447,7 +449,7 @@ x_plus_0.5 <- function(x) {
 }
 
 
-test_that("dpdtmvn works -- 1 continuous, 1 discrete, no truncation, sigma, upper integration limit = point", {
+test_that("dpdtmvn works -- 1 continuous, 1 discrete, no truncation, sigma, upper integration limit = point + 0.5", {
     n <- 100
     x <- matrix(rnorm(2*n), nrow = n)
     x[c(2, 10:95), 2] <- floor(x[c(2, 10:95), 1])
@@ -495,7 +497,7 @@ test_that("dpdtmvn works -- 1 continuous, 1 discrete, no truncation, sigma, uppe
     expect_equal(dpdtmvn_result, dmvnorm_result)
 })
 
-test_that("dpdtmvn works -- 1 continuous, 1 discrete, no truncation, precision, upper integration limit = point", {
+test_that("dpdtmvn works -- 1 continuous, 1 discrete, no truncation, precision, upper integration limit = point + 0.5", {
     n <- 100
     x <- matrix(rnorm(2*n), nrow = n)
     x[c(2, 10:95), 2] <- floor(x[c(2, 10:95), 1])
@@ -545,7 +547,7 @@ test_that("dpdtmvn works -- 1 continuous, 1 discrete, no truncation, precision, 
 
 
 
-test_that("dpdtmvn works -- 1 continuous, 1 discrete, truncation, sigma, upper integration limit = point", {
+test_that("dpdtmvn works -- 1 continuous, 1 discrete, truncation, sigma, upper integration limit = point + 0.5", {
     n <- 100
     x <- matrix(rnorm(2*n), nrow = n)
     x[c(2, 10:95), 2] <- floor(x[c(2, 10:95), 1])
@@ -600,7 +602,7 @@ test_that("dpdtmvn works -- 1 continuous, 1 discrete, truncation, sigma, upper i
 })
 
 
-test_that("dpdtmvn works -- 1 continuous, 1 discrete, truncation, precision, upper integration limit = point", {
+test_that("dpdtmvn works -- 1 continuous, 1 discrete, truncation, precision, upper integration limit = point + 0.5", {
     n <- 100
     x <- matrix(rnorm(2*n), nrow = n)
     x[c(2, 10:95), 2] <- floor(x[c(2, 10:95), 1])
@@ -656,7 +658,7 @@ test_that("dpdtmvn works -- 1 continuous, 1 discrete, truncation, precision, upp
 
 
 
-test_that("dpdtmvn works -- 2 continuous, 1 discrete, no truncation, sigma, upper integration limit = point", {
+test_that("dpdtmvn works -- 2 continuous, 1 discrete, no truncation, sigma, upper integration limit = point + 0.5", {
     n <- 100
     x <- matrix(rnorm(3*n), nrow = n)
     x[c(2, 10:95), 3] <- floor(x[c(3, 10:95), 1])
@@ -705,7 +707,7 @@ test_that("dpdtmvn works -- 2 continuous, 1 discrete, no truncation, sigma, uppe
     expect_equal(dpdtmvn_result, dmvnorm_result)
 })
 
-test_that("dpdtmvn works -- 2 continuous, 1 discrete, no truncation, precision, upper integration limit = point", {
+test_that("dpdtmvn works -- 2 continuous, 1 discrete, no truncation, precision, upper integration limit = point + 0.5", {
     n <- 100
     x <- matrix(rnorm(3*n), nrow = n)
     x[c(2, 10:95), 3] <- floor(x[c(3, 10:95), 1])
@@ -756,7 +758,7 @@ test_that("dpdtmvn works -- 2 continuous, 1 discrete, no truncation, precision, 
 
 
 
-test_that("dpdtmvn works -- 2 continuous, 1 discrete, truncation, sigma, upper integration limit = point", {
+test_that("dpdtmvn works -- 2 continuous, 1 discrete, truncation, sigma, upper integration limit = point + 0.5", {
     n <- 100
     x <- matrix(rnorm(3*n), nrow = n)
     x[c(2, 10:95), 3] <- floor(x[c(3, 10:95), 1])
@@ -814,7 +816,7 @@ test_that("dpdtmvn works -- 2 continuous, 1 discrete, truncation, sigma, upper i
 })
 
 
-test_that("dpdtmvn works -- 2 continuous, 1 discrete, truncation, precision, upper integration limit = point", {
+test_that("dpdtmvn works -- 2 continuous, 1 discrete, truncation, precision, upper integration limit = point + 0.5", {
     n <- 100
     x <- matrix(rnorm(3*n), nrow = n)
     x[c(2, 10:95), 3] <- floor(x[c(3, 10:95), 1])

@@ -1,34 +1,26 @@
-#' Function to evaluate the density of a pdTMVN distribution
+## Miscellaneous functions used in evaluating and sampling from the pdtmvn
+## distribution.
+## 
+## in_pdtmvn_support
+## validate_params_pdtmvn
+## compute_sigma_subcomponents
+## get_conditional_mvn_intermediate_params
+## get_conditional_mvn_params
+## get_conditional_mvn_mean_from_intermediate_params
+## compute_trunc_const_pdtmvn
+## equals_integer
+## floor_x_minus_1
+## calc_Schur_complement
+
+#' Function to determine whether observations are within the support of a
+#' pdTMVN distribution
 #' 
 #' @param x Vector or matrix of quantiles.  If x is a matrix, each row is taken
 #'   to be a quantile.
-#' @param mean Mean vector, default is rep(0, nrow(sigma)).
-#' @param sigma Covariance matrix, default is diag(length(mean)).
-#' @param precision Precision (inverse covariance) matrix.
 #' @param lower Vector of lower truncation points, default is
 #'   rep(-Inf, length = length(mean)).
 #' @param upper Vector of upper truncation points, default is 
 #'   rep(Inf, length = length(mean)).
-#' @param norm_const NOT CURRENTLY USED.  If many calls will be made to this
-#'   function with the same covariance/precision, it may be helpful to
-#'   precompute the normalization constant for the distribution and pass that in
-#'   so that it is not re-calculated on every function call
-#' @param trunc_const If many calls will be made to this function with the same
-#'   covariance/precision and lower/upper truncation bounds, it may be helpful
-#'   to precompute the truncation constant for the distribution and pass that
-#'   in so that it is not re-calculated on every function call
-#' @param sigma_continuous Matrix containing the marginal
-#'   covariance matrix for the continuous variables.  Providing this saves a
-#'   small amount of computation time if precision is provided but sigma isn't.
-#' @param conditional_sigma_discrete Matrix containing the conditional covariance
-#'   of the discrete variables given the continuous variables.  Providing this
-#'   saves a small amount of computation time if sigma is provided but precision
-#'   isn't.
-#' @param conditional_mean_discrete_offset_multiplier Matrix containing
-#'   Sigma_dc Sigma_c^{-1}.  This is used in computing the mean of the underlying
-#'   multivariate normal distribution for the discrete variables conditioning on
-#'   the continuous variables.  Providing this saves a small amount of
-#'   computation time.
 #' @param continuous_vars Vector containing either column names or column
 #'   indices for continuous variables.
 #' @param discrete_vars Vector containing either column names or column indices
@@ -41,83 +33,23 @@
 #'   "in_range" is a character string with the name of a function that returns a
 #'   logical, TRUE if x is in the support of the corresponding discrete variable
 #'   and FALSE otherwise.
-#' @param log Logical; if TRUE, return value is log(density).
-#' @param validate_level Numeric; if 0, no validation is performed (risky!).
-#'   If 1, parameters are validated but warnings about checks not performed are
-#'   not issued.  If 2, parameters are validated and warnings about checks not
-#'   performed are issued.
 #' 
-#' @return Density of pdTMVN distribution evaluated at x
-dpdtmvn <- function(x,
-		mean,
-		sigma,
-		precision,
-		lower = rep(-Inf, length = length(mean)),
-		upper = rep(Inf, length = length(mean)),
-		norm_const,
-		trunc_const,
-		sigma_continuous,
-		conditional_sigma_discrete,
-		conditional_mean_discrete_offset_multiplier,
-		continuous_vars,
-		discrete_vars,
-		discrete_var_range_functions = lapply(seq_along(discrete_vars), function(dv) {
-			list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer")
-		}),
-		log = FALSE,
-		validate_level = TRUE) {
-	
-	## Convert x to matrix if a vector or data frame was passed in
-	if(is.vector(x)) {
-		x_names <- names(x)
-		dim(x) <- c(1, length(x))
-		colnames(x) <- x_names
-	} else if(is.data.frame(x)) {
-		x <- as.matrix(x)
-	}
-	
-	## Validate parameters
-	if(validate_level > 0) {
-		validated_params <- validate_params_pdtmvn(x = x,
-			mean = mean,
-			sigma = sigma,
-			precision = precision,
-			lower = lower,
-			upper = upper,
-			norm_const = norm_const,
-			trunc_const = trunc_const,
-			sigma_continuous = sigma_continuous,
-			conditional_sigma_discrete = conditional_sigma_discrete,
-			conditional_mean_discrete_offset_multiplier = 
-				conditional_mean_discrete_offset_multiplier,
-			continuous_vars = continuous_vars,
-			discrete_vars = discrete_vars,
-			validate_level = validate_level)
-		
-		## validate_params_pdtmvn may update some values that were passed in.
-		## Assign those updated values to the corresponding variables in the
-		## current environment.
-		for(var_name in names(validated_params)) {
-			assign(var_name, validated_params[[var_name]])
-		}
-		
-		rm("validated_params")
-	}
-	
-	## The rest of the code here is closely based on that in the
-	## tmvtnorm package, but we
-	##  - do the integration for partial discretization
-	##  - allow for precomputation of trunc_const
-	##    (and possibly norm_const in the future)
-	
-	## determine whether each observation is in the support of the distribution
-	## 2 ways an x vector could fail to be in the support:
-	##  - a discrete or continuous covariate falls above the upper truncation bound
-	##      or below the lower truncation bound for that covariate
-	##  - a discrete covariate is not at one of the points where the discrete
-	##      distribution for that covariate places positive mass.
-	
-	## truncation limits
+#' @return Integer vector with indices of rows of x that are in the support of
+#'   the pdtmvn distribution
+in_pdtmvn_support <- function(x,
+        lower = rep(-Inf, length = ncol(x)),
+        upper = rep(Inf, length = ncol(x)),
+        continuous_vars,
+        discrete_vars,
+        discrete_var_range_functions) {
+    ## determine whether each observation is in the support of the distribution
+    ## 2 ways an x vector could fail to be in the support:
+    ##  - a discrete or continuous covariate falls above the upper truncation bound
+    ##      or below the lower truncation bound for that covariate
+    ##  - a discrete covariate is not at one of the points where the discrete
+    ##      distribution for that covariate places positive mass.
+    
+    ## truncation limits
 	in_truncation_support <- apply(x, 1, function(x_row) {
 		all(x_row >= lower & x_row <= upper & !any(is.infinite(x_row)))
 	})
@@ -155,105 +87,9 @@ dpdtmvn <- function(x,
 	
 	## in_support are now row indices for observations in support
 	in_support <- which(in_truncation_support & in_discrete_dist_domain)
-	
-	## compute result -- computations are on log scale
-	log_result <- rep(-Inf, nrow(x))
-	
-	## Compute contribution from observations of continuous variables
-	if(length(continuous_vars) > 0 && length(in_support) > 0) {
-		log_result[in_support] <- mvtnorm::dmvnorm(x[in_support, continuous_vars, drop=FALSE],
-			mean = mean[continuous_vars],
-			sigma = sigma_continuous,
-			log = TRUE)
-	}
-	
-	## Compute contribution from observations of discrete variables
-	if(length(discrete_vars) > 0 && length(in_support) > 0) {
-		## get conditional means of discrete vars given continuous vars
-		cond_means <- matrix(rep(mean[discrete_vars], length(in_support)),
-			nrow=length(in_support),
-			byrow=TRUE)
-		
-		if(length(continuous_vars) > 0) {
-			## compute x_ci - mu_c, stacked in a matrix
-			x_c_differences <- sweep(x[in_support, continuous_vars, drop=FALSE],
-				2,
-				mean[continuous_vars],
-				`-`)
-			
-			## adjust -- this step gives us a matrix where row i is the transpose of
-			## mu_d + Sigma_{dc} Sigma_{c}^{-1} (x_ci - mu_c)
-			cond_means <- cond_means +
-				x_c_differences %*% t(conditional_mean_discrete_offset_multiplier)
-		}
-		
-		## get lower bounds on integration for each discrete observation
-		a_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-			do.call(discrete_var_range_functions[[discrete_var_ind]][["a"]],
-				list(x=x[in_support, discrete_vars[discrete_var_ind]])
-			)
-		})
-		if(identical(length(discrete_vars), 1L)) {
-			a_x_discrete <- matrix(a_x_discrete)
-		} else {
-			a_x_discrete <- t(a_x_discrete)
-		}
-
-		
-		## we computed b_x earlier for all x -- subset here for those x in support
-		b_x_discrete <- b_x_discrete[in_support, , drop=FALSE]
-		
-		if(identical(length(discrete_vars), 1L)) {
-			p_lt_b <- pnorm(b_x_discrete[, 1],
-				mean = as.vector(cond_means),
-				sd = sqrt(as.vector(conditional_sigma_discrete)),
-				log = TRUE)
-			
-			p_lt_a <- pnorm(a_x_discrete[, 1],
-				mean = as.vector(cond_means),
-				sd = sqrt(as.vector(conditional_sigma_discrete)),
-				log = TRUE)
-			
-			if(length(continuous_vars) > 0) {
-				log_result[in_support] <- log_result[in_support] +
-					logspace_sub(p_lt_b, p_lt_a)
-			} else {
-				log_result[in_support] <- logspace_sub(p_lt_b, p_lt_a)
-			}
-		} else {
-			stop("dpdtmvn does not currently support discrete_vars with length > 1")
-			## pmvnorm does not support a log=TRUE option; I suspect that we need that
-			## for the probabilities to be non-zero.
-			if(length(continuous_vars) > 0) {
-				log_result[in_support] <- log_result[in_support] +
-					apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
-						mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
-										upper=b_x_discrete[support_row_ind, ],
-										mean=mean[discrete_vars],
-										sigma=conditional_sigma_discrete)
-					})
-			} else {
-				log_result[in_support] <- 
-					apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
-						mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
-										upper=b_x_discrete[support_row_ind, ],
-										mean=mean[discrete_vars],
-										sigma=conditional_sigma_discrete)
-					})
-			}
-		}
-	}
-	
-	## Adjust for truncation by subtracting trunc_const.
-	log_result[in_support] <- log_result[in_support] - trunc_const
-		
-	## Return
-	if(log) {
-		return(log_result)
-	} else {
-		return(exp(log_result))
-	}
-}
+    
+    return(in_support)
+}	
 	
 #' Validate the parameters of a call to dpdtmvn
 #' 
@@ -565,49 +401,17 @@ compute_sigma_subcomponents <- function(sigma = NULL,
         ## if there are both continuous and discrete variables, get
         ## conditional_sigma_discrete and conditional_mean_discrete_offset_multiplier
         if(length(discrete_vars) > 0) {
-            ## Get conditional_sigma_discrete
-            if(missing(conditional_sigma_discrete)) {
-                if(!is.null(precision)) {
-                    precision_d <- precision[discrete_vars, discrete_vars,
-                        drop=FALSE]
-                    sigma_subcomponents$conditional_sigma_discrete <-
-                        solve(precision_d)
-                } else {
-                    sigma_subcomponents$conditional_sigma_discrete <- 
-                        calc_Schur_complement(sigma, discrete_vars)
-                }
-            } else {
-                sigma_subcomponents$conditional_sigma_discrete <-
-                    conditional_sigma_discrete
-                if(validate_level > 1) {
-                    warning("did not check that provided conditional_sigma_discrete agrees with sigma/precision")
-                }
-            }
+            temp <- get_conditional_mvn_intermediate_params(sigma = sigma,
+                precision = precision,
+                fixed_vars = continuous_vars,
+                free_vars = discrete_vars,
+                conditional_sigma = conditional_sigma_discrete,
+                conditional_mean_offset_multiplier = conditional_mean_discrete_offset_multiplier)
             
-            ## Get conditional_mean_discrete_offset_multiplier
-            if(missing(conditional_mean_discrete_offset_multiplier)) {
-                if(!is.null(sigma)) {
-                    sigma_dc <- sigma[discrete_vars, continuous_vars,
-                        drop=FALSE]
-                    
-                    sigma_subcomponents$conditional_mean_discrete_offset_multiplier <-
-                        sigma_dc %*% solve(sigma_subcomponents$sigma_continuous)
-                } else {
-                    precision_d <- precision[discrete_vars, discrete_vars,
-                        drop=FALSE]
-                    precision_dc <- precision[discrete_vars, continuous_vars,
-                        drop=FALSE]
-                    
-                    sigma_subcomponents$conditional_mean_discrete_offset_multiplier <-
-                        -1 * solve(precision_d) %*% precision_dc
-                }
-            } else {
-                sigma_subcomponents$conditional_mean_discrete_offset_multiplier <-
-                    conditional_mean_discrete_offset_multiplier
-                if(validate_level > 1) {
-                    warning("did not check that provided conditional_mean_discrete_offset_multiplier agrees with sigma/precision")
-                }
-            }
+            sigma_subcomponents$conditional_sigma_discrete <-
+                temp$conditional_sigma
+            sigma_subcomponents$conditional_mean_discrete_offset_multiplier <-
+                temp$conditional_mean_offset_multiplier
         }
     } else if(length(discrete_vars) > 0) {
         ## only discrete variables -- we only need conditional_sigma_discrete,
@@ -629,6 +433,172 @@ compute_sigma_subcomponents <- function(sigma = NULL,
     }
     
     return(sigma_subcomponents)
+}
+
+#' Compute "intermediate paramaters" for the conditional distribution of a
+#' subset of variables in a multivariate normal random vector given the other
+#' variables in the vector.  These are the conditional covariance matrix and the
+#' matrix that is used as a multiplier to obtain the conditional mean.  As a
+#' convenience, either of these values may be supplied, in which case they are
+#' returned without any checks of their validity.
+#' 
+#' @param sigma covariance matrix for the full random vector
+#' @param precision precision matrix for the full random vector
+#' @param fixed_vars vector of names or column/row indices corresponding to
+#'   variables that we are conditioning on
+#' @param free_vars vector of names or column/row indices corresponding to
+#'   variables whose conditional distribution we want
+#' @param conditional_sigma (OPTIONAL) conditional covariance matrix of the
+#'   free variables given the fixed variables
+#' @param conditional_mean_offset_multiplier (OPTIONAL) matrix used in computing
+#'   the conditional mean of the free variables given the fixed variables
+#' 
+#' @return a named list with two entries: conditional_sigma and
+#'   conditional_mean_offset_multiplier
+get_conditional_mvn_intermediate_params <- function(sigma,
+    precision,
+    fixed_vars,
+    free_vars,
+    conditional_sigma,
+    conditional_mean_offset_multiplier) {
+    
+    result <- list()
+    
+    ## Get conditional_sigma
+    if(missing(conditional_sigma) || is.null(conditional_sigma)) {
+        if(!missing(precision) && !is.null(precision)) {
+            precision_free <- precision[free_vars, free_vars, drop=FALSE]
+            result$conditional_sigma <- solve(precision_free)
+        } else {
+            result$conditional_sigma <- calc_Schur_complement(sigma, free_vars)
+        }
+    } else {
+        result$conditional_sigma <- conditional_sigma
+        if(validate_level > 1) {
+            warning("did not check that provided conditional_sigma_discrete agrees with sigma/precision")
+        }
+    }
+    
+    ## Get conditional_mean_offset_multiplier
+    if(length(fixed_vars) > 0) {
+        if(missing(conditional_mean_offset_multiplier)) {
+            if(!is.null(sigma)) {
+                sigma_fixed <- sigma[fixed_vars, fixed_vars, drop=FALSE]
+                sigma_free_fixed <- sigma[free_vars, fixed_vars, drop=FALSE]
+                
+                result$conditional_mean_offset_multiplier <-
+                    sigma_free_fixed %*% solve(sigma_fixed)
+            } else {
+                precision_free <- precision[free_vars, free_vars,
+                    drop=FALSE]
+                precision_free_fixed <- precision[free_vars, fixed_vars,
+                    drop=FALSE]
+                
+                result$conditional_mean_offset_multiplier <-
+                    -1 * solve(precision_free) %*% precision_free_fixed
+            }
+        } else {
+            result$conditional_mean_offset_multiplier <-
+                conditional_mean_offset_multiplier
+            if(validate_level > 1) {
+                warning("did not check that provided conditional_mean_offset_multiplier agrees with sigma/precision")
+            }
+        }
+    }
+    
+    return(result)
+}
+
+#' Compute mean and covariance matrix of the conditional distribution of a
+#' subset of variables in a multivariate normal random vector given the other
+#' variables in the vector.
+#' 
+#' @param x_fixed matrix of values of variables to condition on.  Each row is an
+#'   observation of a subset of the variables
+#' @param mean mean of the full random vector
+#' @param sigma covariance matrix for the full random vector
+#' @param precision precision matrix for the full random vector
+#' @param fixed_vars vector of names or column/row indices corresponding to
+#'   variables that we are conditioning on
+#' @param free_vars vector of names or column/row indices corresponding to
+#'   variables whose conditional distribution we want
+#' @param conditional_sigma (OPTIONAL) conditional covariance matrix of the
+#'   free variables given the fixed variables
+#' @param conditional_mean_offset_multiplier (OPTIONAL) matrix used in computing
+#'   the conditional mean of the free variables given the fixed variables
+#' 
+#' @return a named list with two entries: conditional_sigma and
+#'   conditional_mean_offset_multiplier
+get_conditional_mvn_params <- function(x_fixed,
+    mean,
+    sigma,
+    precision,
+    fixed_vars,
+    free_vars,
+    sigma_fixed,
+    conditional_sigma,
+    conditional_mean_offset_multiplier) {
+    temp <- get_conditional_mvn_intermediate_params(sigma,
+        precision,
+        fixed_vars,
+        free_vars,
+        conditional_sigma,
+        conditional_mean_offset_multiplier)
+    
+    result <- list()
+    result$conditional_sigma <- temp$conditional_sigma
+    result$conditional_mean <- get_conditional_mvn_mean_from_intermediate_params(
+        x_fixed = x_fixed,
+        mean = mean,
+        conditional_mean_offset_multiplier = temp$conditional_mean_offset_multiplier,
+        fixed_vars = fixed_vars,
+        free_vars = free_vars)
+    
+    return(result)
+}
+
+#' Compute means of the conditional distribution of a subset of variables in a
+#' multivariate normal random vector given the other variables in the vector.
+#' 
+#' @param x_fixed matrix of values of variables to condition on.  Each row is an
+#'   observation of a subset of the variables
+#' @param mean mean of the full random vector
+#' @param conditional_mean_offset_multiplier matrix used in computing the
+#'   conditional mean of the free variables given the fixed variables
+#' @param fixed_vars vector of names or column/row indices corresponding to
+#'   variables that we are conditioning on
+#' @param free_vars vector of names or column/row indices corresponding to
+#'   variables whose conditional distribution we want
+#' 
+#' @return a named list with two entries: conditional_sigma and
+#'   conditional_mean_offset_multiplier
+get_conditional_mvn_mean_from_intermediate_params <- function(x_fixed,
+    mean,
+    conditional_mean_offset_multiplier,
+    fixed_vars,
+    free_vars) {
+    if(length(fixed_vars) > 0) {
+        cond_means <- matrix(rep(mean[free_vars], nrow(x_fixed)),
+            nrow=nrow(x_fixed),
+            byrow=TRUE)
+        
+        ## compute x_fixed_i - mu_fixed, stacked in a matrix
+        x_fixed_differences <- sweep(x_fixed,
+            2,
+            mean[fixed_vars],
+            `-`)
+        
+        ## adjust -- this step gives us a matrix where row i is the transpose of
+        ## mu_d + Sigma_{free_fixed} Sigma_{fixed}^{-1} (x_fixed_i - mu_fixed)
+        cond_means <- cond_means +
+            x_fixed_differences %*% t(conditional_mean_offset_multiplier)
+    } else {
+        cond_means <- matrix(mean[free_vars],
+            nrow=1,
+            byrow=TRUE)
+    }
+    
+    return(cond_means)
 }
 
 
@@ -698,10 +668,14 @@ floor_x_minus_1 <- function(x) {
 #'   C is the submatrix with columns given by inds and rows not in inds,
 #'   and D is the submatrix with rows and columns not in inds.
 calc_Schur_complement <- function(X, inds) {
-	inds_complement <- which(!(seq_len(ncol(X)) %in% inds))
-	X_1 <- X[inds, inds, drop=FALSE]
-	X_12 <- X[inds, inds_complement, drop=FALSE]
-	X_2 <- X[inds_complement, inds_complement, drop=FALSE]
-	
-	return(X_1 - X_12 %*% solve(X_2) %*% t(X_12))
+    if(length(inds) == ncol(X)) {
+        return(X)
+    } else {
+        inds_complement <- which(!(seq_len(ncol(X)) %in% inds))
+        X_1 <- X[inds, inds, drop=FALSE]
+        X_12 <- X[inds, inds_complement, drop=FALSE]
+        X_2 <- X[inds_complement, inds_complement, drop=FALSE]
+        
+        return(X_1 - X_12 %*% solve(X_2) %*% t(X_12))
+    }
 }

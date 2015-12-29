@@ -2,6 +2,8 @@ library(pdtmvn)
 library(mvtnorm)
 library(tmvtnorm)
 
+context("dpdtmvn -- univariate")
+
 test_that("dpdtmvn works -- 1 continuous, 0 discrete, no truncation, sigma", {
 	n <- 100
 	x <- matrix(rnorm(n))
