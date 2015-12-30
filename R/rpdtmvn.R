@@ -26,7 +26,7 @@
 #'   indices for continuous variables.
 #' @param discrete_vars Vector containing either column names or column indices
 #'   for discrete variables.
-#' @param discrete_var_range_functions a list with one entry for each element
+#' @param discrete_var_range_fns a list with one entry for each element
 #'   of discrete_vars.  Each entry is a named list of length 4: the element
 #'   named "a" is a character string with the name of a function that returns
 #'   a(x) for any real x; the element named "b" is a character string with the
@@ -53,10 +53,10 @@ rpdtmvn <- function(n,
 		conditional_mean_discrete_offset_multiplier,
 		continuous_vars,
 		discrete_vars,
-		discrete_var_range_functions = lapply(seq_along(discrete_vars), function(dv) {
+		discrete_var_range_fns = lapply(seq_along(discrete_vars), function(dv) {
 			list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer", discretize = "ceiling")
 		}),
-		validate_level = TRUE) {
+		validate_level = 1L) {
 	
 	## Convert x_fixed to matrix if a vector or data frame was passed in
     if(!missing(x_fixed) && !is.null(x_fixed)) {
@@ -95,6 +95,7 @@ rpdtmvn <- function(n,
         stop("at least one of mean, sigma, and/or precision must include names, row names, or column names")
     }
     
+    mean <- as.numeric(mean)
     names(mean) <- var_names
     if(!missing(sigma) && !is.null(sigma)) {
         rownames(sigma) <- var_names
@@ -107,10 +108,11 @@ rpdtmvn <- function(n,
     
     if(!missing(x_fixed) && !is.null(x_fixed)) {
         fixed_vars <- which(var_names %in% colnames(x_fixed))
+        free_vars <- which(!(var_names %in% colnames(x_fixed)))
     } else {
         fixed_vars <- NULL
+        free_vars <- seq_along(mean)
     }
-    free_vars <- which(!(var_names %in% fixed_vars))
     
 	## Validate parameters
 	if(validate_level > 0) {
@@ -130,13 +132,11 @@ rpdtmvn <- function(n,
         }
         
         validated_params <- validate_params_pdtmvn(x = matrix(mean, nrow = 1),
-			mean = mean,
+			mean = as.vector(mean),
 			sigma = sigma,
 			precision = precision,
 			lower = lower,
 			upper = upper,
-			norm_const = norm_const,
-			trunc_const = trunc_const,
 			sigma_continuous = sigma_continuous,
 			conditional_sigma_discrete = conditional_sigma_discrete,
 			conditional_mean_discrete_offset_multiplier = 
@@ -157,14 +157,35 @@ rpdtmvn <- function(n,
 	
     ## in_support are row indices for observations in x_fixed in support
     if(!missing(x_fixed)) {
+        x_fixed_continuous_vars <- which(
+            which(var_names %in% names(x_fixed)) # inds for var_names that are in names(x_fixed)
+            %in%
+            continuous_vars # inds for var_names that are discrete
+        ) # inds of x_fixed that correspond to continuous vars
+        
+        x_fixed_discrete_vars <- which(
+            which(var_names %in% names(x_fixed)) # inds for var_names that are in names(x_fixed)
+            %in%
+            discrete_vars # inds for var_names that are discrete
+        ) # inds of x_fixed that correspond to discrete vars
+        
+        discrete_vars_in_x_fixed <- which(
+            discrete_vars # inds for var_names that are discrete
+            %in%
+            which(var_names %in% names(x_fixed)) # inds for var_names that are in names(x_fixed)
+        ) # inds of discrete vars that are also in x_fixed that correspond to discrete vars
+        x_fixed_discrete_var_range_fns <- discrete_var_range_fns[
+            discrete_vars_in_x_fixed
+        ]
+        
         in_support <- in_pdtmvn_support(x_fixed,
             lower = lower[names(x_fixed)],
             upper = upper[names(x_fixed)],
-            continuous_vars,
-            discrete_vars,
-            discrete_var_range_functions)
+            continuous_vars = x_fixed_continuous_vars,
+            discrete_vars = x_fixed_discrete_vars,
+            discrete_var_range_fns = x_fixed_discrete_var_range_fns)
         
-        if(!in_support) {
+        if(length(in_support) == 0) {
             stop("provided value for x_fixed was not in the support of the distribution")
         }
     }
@@ -182,42 +203,44 @@ rpdtmvn <- function(n,
     ##    from the truncated multivariate normal conditional on w_fixed
     ##  3) Censor the values in w_free corresponding to discrete variables
     w <- matrix(NA, nrow = n, ncol = length(mean))
-    colnames(w) <- names(mean)
+    colnames(w) <- var_names
     
     ## Step 1) is only relevant if x_fixed was provided
     if(!missing(x_fixed) && !is.null(x_fixed) && nrow(x_fixed) > 0) {
-        w <- rpdtmvn_sample_w_fixed(n,
-            w,
-            x_fixed,
-            fixed_vars,
-            mean,
-            sigma,
-            precision,
-            lower,
-            upper,
-            sigma_continuous,
-            conditional_sigma_discrete,
-            conditional_mean_discrete_offset_multiplier,
-            continuous_vars,
-            discrete_vars,
-            discrete_var_range_functions,
-            validate_level = TRUE)
+        w <- rpdtmvn_sample_w_fixed(
+            n = n,
+            w = w,
+            x_fixed = x_fixed,
+            fixed_vars = fixed_vars,
+            mean = mean,
+            sigma = sigma,
+            precision = precision,
+            lower = lower,
+            upper = upper,
+            continuous_vars = continuous_vars,
+            discrete_vars = discrete_vars,
+            discrete_var_range_fns = discrete_var_range_fns,
+            validate_level = validate_level)
     }
     
     ## Step 2) -- sample latent w_free
-    w <- rpdtmvn_sample_w_free(n,
-        w,
-        x_fixed,
-        fixed_vars,
-        free_vars,
-        mean,
-        sigma,
-        precision,
-        lower,
-        upper)
+    w <- rpdtmvn_sample_w_free(
+        n = n,
+        w = w,
+        x_fixed = x_fixed,
+        fixed_vars = fixed_vars,
+        free_vars = free_vars,
+        mean = mean,
+        sigma = sigma,
+        precision = precision,
+        lower = lower,
+        upper = upper,
+        validate_level = validate_level)
     
     ## Step 3) -- censor columns of w corresponding to discrete variables
-    w <- rpdtmvn_discretize_w()
+    w <- rpdtmvn_discretize_w(w = w,
+        discrete_vars = discrete_vars,
+        discrete_var_range_fns = discrete_var_range_fns)
     
 	## Return
     return(w)
@@ -245,7 +268,7 @@ rpdtmvn <- function(n,
 #'   indices for continuous variables.
 #' @param discrete_vars Vector containing either column names or column indices
 #'   for discrete variables.
-#' @param discrete_var_range_functions a list with one entry for each element
+#' @param discrete_var_range_fns a list with one entry for each element
 #'   of discrete_vars.  Each entry is a named list with at least two elements:
 #'   the element named "a" is a function that returns a(x) for any real x; the
 #'   element named "b" is a function that returns b(x) for any real x.
@@ -268,55 +291,61 @@ rpdtmvn_sample_w_fixed <- function(
     upper,
     continuous_vars,
     discrete_vars,
-    discrete_var_range_functions) {
+    discrete_var_range_fns,
+    validate_level) {
     
     fixed_continuous_vars <- fixed_vars[fixed_vars %in% continuous_vars]
     fixed_discrete_vars <- fixed_vars[fixed_vars %in% discrete_vars]
     
     ## Step 1) (a)
-    w[, fixed_continuous_vars] <- rep(x_fixed[1, fixed_continuous_vars],
-        each = n)
+    if(length(fixed_continuous_vars) > 0) {
+        w[, fixed_continuous_vars] <- rep(x_fixed[1, fixed_continuous_vars],
+            each = n)
+    }
     
     ## Step 1) (b)
-    lower_gen_w_fixed_disc <- sapply(
-        fixed_discrete_vars,
-        function(discrete_var_ind) {
-            discrete_var_name <- colnames(x_fixed)[discrete_var_ind]
-            do.call(discrete_var_range_functions[[discrete_var_name]][["a"]],
-                list(x=x_fixed[1, discrete_var_name])
-            )
-        }
-    )
-    lower_gen_w_fixed_disc <- apply(rbind(lower, lower_gen_w_fixed_disc),
-        2,
-        max)
-    
-    upper_gen_w_fixed_disc <- sapply(
-        which(colnames(x_fixed) %in% x_fixed_discrete_names),
-        function(discrete_var_ind) {
-            discrete_var_name <- colnames(x_fixed)[discrete_var_ind]
-            do.call(discrete_var_range_functions[[discrete_var_name]][["b"]],
-                list(x=x_fixed[1, discrete_var_name])
-            )
-        }
-    )
-    upper_gen_w_fixed_disc <- apply(rbind(upper, upper_gen_w_fixed_disc),
-        2,
-        max)
-    
-    temp <- get_conditional_mvn_params(x_fixed = x_fixed[, fixed_continuous_vars, drop = FALSE],
-        mean = mean[fixed_vars],
-        sigma = sigma[fixed_vars, fixed_vars, drop = FALSE],
-        fixed_vars = which(fixed_vars %in% fixed_continuous_vars),
-        free_vars = which(fixed_vars %in% fixed_discrete_vars))
-    mean_gen_w_fixed_disc <- temp$conditional_mean
-    sigma_gen_w_fixed_disc <- temp$conditional_sigma
-    
-    w[, x_fixed_discrete_names] <- tmvtnorm::rtmvnorm(n = n,
-        mean = mean_gen_w_fixed_disc,
-        sigma = sigma_gen_w_fixed_disc,
-        lower = lower_gen_w_fixed_disc,
-        upper = upper_gen_w_fixed_disc)
+    if(length(fixed_discrete_vars) > 0) {
+        lower_gen_w_fixed_disc <- sapply(
+            fixed_discrete_vars,
+            function(discrete_var_ind) {
+                discrete_var_name <- colnames(x_fixed)[discrete_var_ind]
+                do.call(discrete_var_range_fns[[discrete_var_name]][["a"]],
+                    list(x=x_fixed[1, discrete_var_name])
+                )
+            }
+        )
+        lower_gen_w_fixed_disc <- apply(rbind(lower, lower_gen_w_fixed_disc),
+            2,
+            max)
+        
+        upper_gen_w_fixed_disc <- sapply(
+            which(colnames(x_fixed) %in% x_fixed_discrete_names),
+            function(discrete_var_ind) {
+                discrete_var_name <- colnames(x_fixed)[discrete_var_ind]
+                do.call(discrete_var_range_fns[[discrete_var_name]][["b"]],
+                    list(x=x_fixed[1, discrete_var_name])
+                )
+            }
+        )
+        upper_gen_w_fixed_disc <- apply(rbind(upper, upper_gen_w_fixed_disc),
+            2,
+            max)
+        
+        temp <- get_conditional_mvn_params(x_fixed = x_fixed[, fixed_continuous_vars, drop = FALSE],
+            mean = mean[fixed_vars],
+            sigma = sigma[fixed_vars, fixed_vars, drop = FALSE],
+            fixed_vars = which(fixed_vars %in% fixed_continuous_vars),
+            free_vars = which(fixed_vars %in% fixed_discrete_vars),
+            validate_level = validate_level)
+        mean_gen_w_fixed_disc <- temp$conditional_mean
+        sigma_gen_w_fixed_disc <- temp$conditional_sigma
+        
+        w[, x_fixed_discrete_names] <- tmvtnorm::rtmvnorm(n = n,
+            mean = mean_gen_w_fixed_disc,
+            sigma = sigma_gen_w_fixed_disc,
+            lower = lower_gen_w_fixed_disc,
+            upper = upper_gen_w_fixed_disc)
+    }
     
     return(w)
 }
@@ -351,13 +380,15 @@ rpdtmvn_sample_w_free <- function(
     sigma,
     precision,
     lower,
-    upper) {
+    upper,
+    validate_level) {
     
     temp <- get_conditional_mvn_params(x_fixed = x_fixed,
         mean = mean,
         sigma = sigma,
         fixed_vars = fixed_vars,
-        free_vars = free_vars)
+        free_vars = free_vars,
+        validate_level = validate_level)
     mean_w_free <- as.vector(temp$conditional_mean)
     sigma_w_free <- temp$conditional_sigma
     
@@ -377,7 +408,7 @@ rpdtmvn_sample_w_free <- function(
 #' @param w matrix with column names specified with observations of latent
 #'   variables from a tmvn distribution.
 #' @param discrete_vars Vector containing column indices for discrete variables.
-#' @param discrete_var_range_functions a list with one entry for each element
+#' @param discrete_var_range_fns a list with one entry for each element
 #'   of discrete_vars.  Each entry is a named list which must contain an element
 #'   named "discretizer", which is a function that takes continuous values and
 #'   returns the corresponding discretized values.
@@ -386,13 +417,15 @@ rpdtmvn_sample_w_free <- function(
 #'   have been discretized.
 rpdtmvn_discretize_w <- function(w,
     discrete_vars,
-    discrete_var_range_functions) {
+    discrete_var_range_fns) {
     
     for(discrete_var in discrete_vars) {
         discrete_var_name <- colnames(w)[discrete_var]
         w[, discrete_var] <- do.call(
-            discrete_var_range_functions[[discrete_var_name]][["discretizer"]],
+            discrete_var_range_fns[[discrete_var_name]][["discretizer"]],
             list(x=w[, discrete_var])
         )
     }
+    
+    return(w)
 }

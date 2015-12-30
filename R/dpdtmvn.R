@@ -33,7 +33,7 @@
 #'   indices for continuous variables.
 #' @param discrete_vars Vector containing either column names or column indices
 #'   for discrete variables.
-#' @param discrete_var_range_functions a list with one entry for each element
+#' @param discrete_var_range_fns a list with one entry for each element
 #'   of discrete_vars.  Each entry is a named list of length 3; the element
 #'   named "a" is a character string with the name of a function that returns
 #'   a(x) for any real x, the element named "b" is a character string with the
@@ -61,11 +61,11 @@ dpdtmvn <- function(x,
 		conditional_mean_discrete_offset_multiplier,
 		continuous_vars,
 		discrete_vars,
-		discrete_var_range_functions = lapply(seq_along(discrete_vars), function(dv) {
+		discrete_var_range_fns = lapply(seq_along(discrete_vars), function(dv) {
 			list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer")
 		}),
 		log = FALSE,
-		validate_level = TRUE) {
+		validate_level = 1L) {
 	
 	## Convert x to matrix if a vector or data frame was passed in
 	if(is.vector(x)) {
@@ -116,7 +116,7 @@ dpdtmvn <- function(x,
         upper = upper,
         continuous_vars,
         discrete_vars,
-        discrete_var_range_functions)
+        discrete_var_range_fns)
     
 	## compute result -- computations are on log scale
 	log_result <- rep(-Inf, nrow(x))
@@ -142,12 +142,12 @@ dpdtmvn <- function(x,
 		## get lower and upper bounds on integration for each discrete
         ## observation
 		a_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-			do.call(discrete_var_range_functions[[discrete_var_ind]][["a"]],
+			do.call(discrete_var_range_fns[[discrete_var_ind]][["a"]],
 				list(x=x[in_support, discrete_vars[discrete_var_ind]])
 			)
 		})
         b_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-            do.call(discrete_var_range_functions[[discrete_var_ind]][["b"]],
+            do.call(discrete_var_range_fns[[discrete_var_ind]][["b"]],
                 list(x=x[in_support, discrete_vars[discrete_var_ind]])
             )
         })

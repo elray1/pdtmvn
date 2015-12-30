@@ -25,7 +25,7 @@
 #'   indices for continuous variables.
 #' @param discrete_vars Vector containing either column names or column indices
 #'   for discrete variables.
-#' @param discrete_var_range_functions a list with one entry for each element
+#' @param discrete_var_range_fns a list with one entry for each element
 #'   of discrete_vars.  Each entry is a named list of length 3; the element
 #'   named "a" is a character string with the name of a function that returns
 #'   a(x) for any real x, the element named "b" is a character string with the
@@ -41,7 +41,7 @@ in_pdtmvn_support <- function(x,
         upper = rep(Inf, length = ncol(x)),
         continuous_vars,
         discrete_vars,
-        discrete_var_range_functions) {
+        discrete_var_range_fns) {
     ## determine whether each observation is in the support of the distribution
     ## 2 ways an x vector could fail to be in the support:
     ##  - a discrete or continuous covariate falls above the upper truncation bound
@@ -61,7 +61,7 @@ in_pdtmvn_support <- function(x,
 		
 		## the vector b_x for each row of x
 		b_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-			do.call(discrete_var_range_functions[[discrete_var_ind]][["b"]],
+			do.call(discrete_var_range_fns[[discrete_var_ind]][["b"]],
 				list(x=x[, discrete_vars[discrete_var_ind]])
 			)
 		})
@@ -74,7 +74,7 @@ in_pdtmvn_support <- function(x,
 		## logical vector of length nrow(x) with whether all entries corresponding to
 		## discrete variables in row i of x are in their domains
 		in_discrete_dist_domain <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-		    do.call(discrete_var_range_functions[[discrete_var_ind]][["in_range"]],
+		    do.call(discrete_var_range_fns[[discrete_var_ind]][["in_range"]],
 		        list(x=x[, discrete_vars[discrete_var_ind]])
 		    )
 		})
@@ -148,7 +148,7 @@ validate_params_pdtmvn <- function(x,
 	
 	if(validate_level > 1) {
 		warning("parameter validation does not yet check whether your truncation limits make sense relative to your functions for computing the range of you discrete random variables.")
-		warning("parameter validation does not yet check whether your discrete_var_range_functions are in the same order as the discrete columns of x")
+		warning("parameter validation does not yet check whether your discrete_var_range_fns are in the same order as the discrete columns of x")
 	}
 	
 	## list of results
@@ -406,7 +406,8 @@ compute_sigma_subcomponents <- function(sigma = NULL,
                 fixed_vars = continuous_vars,
                 free_vars = discrete_vars,
                 conditional_sigma = conditional_sigma_discrete,
-                conditional_mean_offset_multiplier = conditional_mean_discrete_offset_multiplier)
+                conditional_mean_offset_multiplier = conditional_mean_discrete_offset_multiplier,
+                validate_level = validate_level)
             
             sigma_subcomponents$conditional_sigma_discrete <-
                 temp$conditional_sigma
@@ -460,7 +461,8 @@ get_conditional_mvn_intermediate_params <- function(sigma,
     fixed_vars,
     free_vars,
     conditional_sigma,
-    conditional_mean_offset_multiplier) {
+    conditional_mean_offset_multiplier,
+    validate_level = 1L) {
     
     result <- list()
     
@@ -537,13 +539,15 @@ get_conditional_mvn_params <- function(x_fixed,
     free_vars,
     sigma_fixed,
     conditional_sigma,
-    conditional_mean_offset_multiplier) {
+    conditional_mean_offset_multiplier,
+    validate_level = 1L) {
     temp <- get_conditional_mvn_intermediate_params(sigma,
         precision,
         fixed_vars,
         free_vars,
         conditional_sigma,
-        conditional_mean_offset_multiplier)
+        conditional_mean_offset_multiplier,
+        validate_level = validate_level)
     
     result <- list()
     result$conditional_sigma <- temp$conditional_sigma
