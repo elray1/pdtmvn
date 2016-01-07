@@ -65,6 +65,7 @@ dpdtmvn <- function(x,
 			list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer")
 		}),
 		log = FALSE,
+        validate_in_support = TRUE,
 		validate_level = 1L) {
 	
 	## Convert x to matrix if a vector or data frame was passed in
@@ -111,12 +112,16 @@ dpdtmvn <- function(x,
 	##    (and possibly norm_const in the future)
 	
 	## in_support are row indices for observations in support
-	in_support <- in_pdtmvn_support(x,
-        lower = lower,
-        upper = upper,
-        continuous_vars,
-        discrete_vars,
-        discrete_var_range_fns)
+    if(validate_in_support) {
+        in_support <- in_pdtmvn_support(x,
+            lower = lower,
+            upper = upper,
+            continuous_vars,
+            discrete_vars,
+            discrete_var_range_fns)
+    } else {
+        in_support <- seq_len(nrow(x))
+    }
     
 	## compute result -- computations are on log scale
 	log_result <- rep(-Inf, nrow(x))

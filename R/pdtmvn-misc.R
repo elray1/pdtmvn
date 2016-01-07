@@ -2,6 +2,7 @@
 ## distribution.
 ## 
 ## in_pdtmvn_support
+## calc_in_truncation_support
 ## validate_params_pdtmvn
 ## compute_sigma_subcomponents
 ## get_conditional_mvn_intermediate_params
@@ -50,9 +51,7 @@ in_pdtmvn_support <- function(x,
     ##      distribution for that covariate places positive mass.
     
     ## truncation limits
-	in_truncation_support <- apply(x, 1, function(x_row) {
-		all(x_row >= lower & x_row <= upper & !any(is.infinite(x_row)))
-	})
+	in_truncation_support <- calc_in_truncation_support(x, lower, upper)
 	
 	## discrete distribution domain
 	if(length(discrete_vars) > 0) {
@@ -89,7 +88,25 @@ in_pdtmvn_support <- function(x,
 	in_support <- which(in_truncation_support & in_discrete_dist_domain)
     
     return(in_support)
-}	
+}
+
+#' Function to determine whether observations are within the truncation support of a
+#' pdTMVN distribution
+#' 
+#' @param x Matrix of quantiles.  If x is a matrix, each row is taken
+#'   to be a quantile.
+#' @param lower Vector of lower truncation points
+#' @param upper Vector of upper truncation points
+#' 
+#' @return Logical vector with length = number of rows of x, where entry i is TRUE if row i
+#'   is between the bounds specified by lower and upper and FALSE otherwise
+calc_in_truncation_support <- function(x, lower, upper) {
+	storage.mode(x) <- "double"
+	storage.mode(lower) <- "double"
+	storage.mode(upper) <- "double"
+	
+	return(as.logical(.Call("in_truncation_support_C", x, lower, upper)))
+}
 	
 #' Validate the parameters of a call to dpdtmvn
 #' 

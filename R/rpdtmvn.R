@@ -56,6 +56,7 @@ rpdtmvn <- function(n,
 		discrete_var_range_fns = lapply(seq_along(discrete_vars), function(dv) {
 			list(a = "floor_x_minus_1", b = "floor", in_range = "equals_integer", discretize = "ceiling")
 		}),
+        validate_in_support = TRUE,
 		validate_level = 1L) {
 	
 	## Convert x_fixed to matrix if a vector or data frame was passed in
@@ -156,7 +157,7 @@ rpdtmvn <- function(n,
 	}
 	
     ## in_support are row indices for observations in x_fixed in support
-    if(!missing(x_fixed)) {
+    if(!missing(x_fixed) && validate_in_support) {
         x_fixed_continuous_vars <- which(
             which(var_names %in% names(x_fixed)) # inds for var_names that are in names(x_fixed)
             %in%

@@ -127,6 +127,34 @@ SEXP logspace_sub_matrix_rows_C(SEXP Xp, SEXP N_rowp) {
 	return retval;
 }
 
+SEXP in_truncation_support_C(SEXP Xp, SEXP lowerp, SEXP upperp) {
+	int i, j,
+		n_row = *(INTEGER(getAttrib(Xp, R_DimSymbol))),
+		n_col = *(INTEGER(getAttrib(Xp, R_DimSymbol)) + 1);
+
+	SEXP retval = PROTECT(allocVector(INTSXP, n_row));
+	int *intptr = INTEGER(retval);
+	
+	double *X = REAL(Xp),
+		*lower = REAL(lowerp),
+		*upper = REAL(upperp);
+	
+	for(i = 0; i < n_row; i++) {
+		*(intptr + i) = 1;
+		for(j = 0; j < n_col; j++) {
+			if(*(X + i + j*n_row) < *(lower + j) ||
+				*(X + i + j*n_row) > *(upper + j) ||
+				*(X + i + j*n_row) == R_NegInf ||
+				*(X + i + j*n_row) == R_PosInf) {
+				*(intptr + i) = 0;
+				break;
+			}
+		}
+	}
+	
+	UNPROTECT(1);
+	return retval;
+}
 
 R_CallMethodDef callMethods[] =
 {
@@ -134,10 +162,12 @@ R_CallMethodDef callMethods[] =
     {"logspace_sum_matrix_rows_C", (DL_FUNC)&logspace_sum_matrix_rows_C, 3},
     {"logspace_sub_C", (DL_FUNC)&logspace_sub_C, 2},
     {"logspace_sub_matrix_rows_C", (DL_FUNC)&logspace_sub_matrix_rows_C, 2},
-	{NULL,NULL, 0}
+    {"in_truncation_support_C", (DL_FUNC)&in_truncation_support_C, 3},
+    {NULL,NULL, 0}
 };
 
 void R_init_pdtmvn(DllInfo *dll)
 {
-   R_registerRoutines(dll,NULL,callMethods,NULL,NULL);
+    R_registerRoutines(dll,NULL,callMethods,NULL,NULL);
 }
+

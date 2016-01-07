@@ -5,6 +5,7 @@
 ##   no leading character means test needs to be written still
 ## 
 ## I in_pdtmvn_support
+## X calc_in_truncation_support
 ## I validate_params_pdtmvn
 ## I compute_sigma_subcomponents
 ## I get_conditional_mvn_intermediate_params
@@ -21,3 +22,21 @@ context("pdtmvn-misc -- no tests implemented")
 #test_that("calc_Schur_complement works", {
 #    
 #})
+
+test_that("calc_in_truncation_support works", {
+        lower <- c(-Inf, 0.7, -10)
+        upper <- c(Inf, 1, 5)
+        
+        x <- rbind(
+            c(-1, 5, 3), # upper bound exceeded on second entry
+            c(0, 0, 1.3), # lower bound exceeded on second entry
+            c(-Inf, 1, 0), # infinite
+            c(Inf, 1, 0), # infinite
+            c(0, 1, 5) # passes
+        )
+        
+        expect_identical(
+            c(FALSE, FALSE, FALSE, FALSE, TRUE),
+            calc_in_truncation_support(x, lower, upper)
+        )
+})

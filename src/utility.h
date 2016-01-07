@@ -24,3 +24,6 @@ SEXP logspace_sub_C(SEXP x, SEXP y);
 SEXP logspace_sum_matrix_rows(SEXP Xp, SEXP N_rowp, SEXP N_colp);
 
 SEXP logspace_sub_matrix_rows(SEXP Xp, SEXP N_rowp);
+
+SEXP in_truncation_support_C(SEXP Xp, SEXP lowerp, SEXP upperp);
+
