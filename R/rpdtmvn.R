@@ -115,6 +115,14 @@ rpdtmvn <- function(n,
         free_vars <- seq_along(mean)
     }
     
+    ## set names of lower and upper if they are NULL
+    if(is.null(names(lower))) {
+        names(lower) <- var_names
+    }
+    if(is.null(names(upper))) {
+        names(upper) <- var_names
+    }
+    
 	## Validate parameters
 	if(validate_level > 0) {
         ## validate n
@@ -159,13 +167,13 @@ rpdtmvn <- function(n,
     ## in_support are row indices for observations in x_fixed in support
     if(!missing(x_fixed) && validate_in_support) {
         x_fixed_continuous_vars <- which(
-            which(var_names %in% names(x_fixed)) # inds for var_names that are in names(x_fixed)
+            which(var_names %in% colnames(x_fixed)) # inds for var_names that are in names(x_fixed)
             %in%
             continuous_vars # inds for var_names that are discrete
         ) # inds of x_fixed that correspond to continuous vars
         
         x_fixed_discrete_vars <- which(
-            which(var_names %in% names(x_fixed)) # inds for var_names that are in names(x_fixed)
+            which(var_names %in% colnames(x_fixed)) # inds for var_names that are in names(x_fixed)
             %in%
             discrete_vars # inds for var_names that are discrete
         ) # inds of x_fixed that correspond to discrete vars
@@ -173,15 +181,15 @@ rpdtmvn <- function(n,
         discrete_vars_in_x_fixed <- which(
             discrete_vars # inds for var_names that are discrete
             %in%
-            which(var_names %in% names(x_fixed)) # inds for var_names that are in names(x_fixed)
+            which(var_names %in% colnames(x_fixed)) # inds for var_names that are in names(x_fixed)
         ) # inds of discrete vars that are also in x_fixed that correspond to discrete vars
         x_fixed_discrete_var_range_fns <- discrete_var_range_fns[
             discrete_vars_in_x_fixed
         ]
         
         in_support <- in_pdtmvn_support(x_fixed,
-            lower = lower[names(x_fixed)],
-            upper = upper[names(x_fixed)],
+            lower = lower[colnames(x_fixed)],
+            upper = upper[colnames(x_fixed)],
             continuous_vars = x_fixed_continuous_vars,
             discrete_vars = x_fixed_discrete_vars,
             discrete_var_range_fns = x_fixed_discrete_var_range_fns)
