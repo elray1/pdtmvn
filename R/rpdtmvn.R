@@ -61,7 +61,7 @@ rpdtmvn <- function(n,
 	
 	## Convert x_fixed to matrix if a vector or data frame was passed in
     if(!missing(x_fixed) && !is.null(x_fixed)) {
-        if(is.vector(x_fixed)) {
+        if(length(dim(x_fixed)) == 1L) {
             x_fixed_names <- names(x_fixed)
             dim(x_fixed) <- c(1, length(x_fixed))
             colnames(x_fixed) <- x_fixed_names
@@ -305,10 +305,12 @@ rpdtmvn_sample_w_fixed <- function(
     
     fixed_continuous_vars <- fixed_vars[fixed_vars %in% continuous_vars]
     fixed_discrete_vars <- fixed_vars[fixed_vars %in% discrete_vars]
+    fixed_continuous_var_names <- colnames(w)[fixed_continuous_vars]
+    fixed_discrete_var_names <- colnames(w)[fixed_discrete_vars]
     
     ## Step 1) (a)
     if(length(fixed_continuous_vars) > 0) {
-        w[, fixed_continuous_vars] <- rep(x_fixed[1, fixed_continuous_vars],
+        w[, fixed_continuous_var_names] <- rep(x_fixed[1, fixed_continuous_var_names],
             each = n)
     }
     
@@ -317,7 +319,7 @@ rpdtmvn_sample_w_fixed <- function(
         lower_gen_w_fixed_disc <- sapply(
             fixed_discrete_vars,
             function(discrete_var_ind) {
-                discrete_var_name <- colnames(x_fixed)[discrete_var_ind]
+                discrete_var_name <- colnames(w)[discrete_var_ind]
                 do.call(discrete_var_range_fns[[discrete_var_name]][["a"]],
                     list(x=x_fixed[1, discrete_var_name])
                 )
@@ -328,9 +330,9 @@ rpdtmvn_sample_w_fixed <- function(
             max)
         
         upper_gen_w_fixed_disc <- sapply(
-            which(colnames(x_fixed) %in% x_fixed_discrete_names),
+            fixed_discrete_vars,
             function(discrete_var_ind) {
-                discrete_var_name <- colnames(x_fixed)[discrete_var_ind]
+                discrete_var_name <- colnames(w)[discrete_var_ind]
                 do.call(discrete_var_range_fns[[discrete_var_name]][["b"]],
                     list(x=x_fixed[1, discrete_var_name])
                 )
@@ -340,7 +342,7 @@ rpdtmvn_sample_w_fixed <- function(
             2,
             max)
         
-        temp <- get_conditional_mvn_params(x_fixed = x_fixed[, fixed_continuous_vars, drop = FALSE],
+        temp <- get_conditional_mvn_params(x_fixed = x_fixed[, fixed_continuous_var_names, drop = FALSE],
             mean = mean[fixed_vars],
             sigma = sigma[fixed_vars, fixed_vars, drop = FALSE],
             fixed_vars = which(fixed_vars %in% fixed_continuous_vars),
@@ -349,7 +351,7 @@ rpdtmvn_sample_w_fixed <- function(
         mean_gen_w_fixed_disc <- temp$conditional_mean
         sigma_gen_w_fixed_disc <- temp$conditional_sigma
         
-        w[, x_fixed_discrete_names] <- tmvtnorm::rtmvnorm(n = n,
+        w[, fixed_discrete_var_names] <- tmvtnorm::rtmvnorm(n = n,
             mean = mean_gen_w_fixed_disc,
             sigma = sigma_gen_w_fixed_disc,
             lower = lower_gen_w_fixed_disc,
