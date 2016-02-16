@@ -325,9 +325,9 @@ validate_params_pdtmvn <- function(x,
 		}
 	}
 
-	if(length(discrete_vars) > 1) {
-		stop("dpdtmvn does not currently support discrete_vars with length > 1.")
-	}
+#	if(length(discrete_vars) > 1) {
+#		stop("dpdtmvn does not currently support discrete_vars with length > 1.")
+#	}
 
 	validated_params$continuous_vars <- continuous_vars
 	validated_params$discrete_vars <- discrete_vars
@@ -614,8 +614,10 @@ get_conditional_mvn_mean_from_intermediate_params <- function(x_fixed,
         cond_means <- cond_means +
             x_fixed_differences %*% t(conditional_mean_offset_multiplier)
     } else {
-        cond_means <- matrix(mean[free_vars],
-            nrow=1,
+        nrow_retval <- 1L
+        try(nrow_retval <- nrow(x_fixed), silent = TRUE)
+        cond_means <- matrix(rep(mean[free_vars], each = nrow_retval),
+            nrow=nrow_retval,
             byrow=TRUE)
     }
     

@@ -68,13 +68,15 @@ dpdtmvn <- function(x,
         validate_in_support = TRUE,
 		validate_level = 1L) {
 	
-	## Convert x to matrix if a vector or data frame was passed in
-	if(is.vector(x)) {
-		x_names <- names(x)
-		dim(x) <- c(1, length(x))
-		colnames(x) <- x_names
-	} else if(is.data.frame(x)) {
-		x <- as.matrix(x)
+	## Convert x to matrix if a numeric vector or data frame was passed in
+	if(!is.matrix(x)) {
+        if(is.data.frame(x)) {
+            x <- as.matrix(x)
+        } else if(is.numeric(x)) {
+            x_names <- names(x)
+            dim(x) <- c(1, length(x))
+            colnames(x) <- x_names
+        }
 	}
 	
 	## Validate parameters
@@ -182,15 +184,16 @@ dpdtmvn <- function(x,
 				log_result[in_support] <- logspace_sub(p_lt_b, p_lt_a)
 			}
 		} else {
-			stop("dpdtmvn does not currently support discrete_vars with length > 1")
+#			stop("dpdtmvn does not currently support discrete_vars with length > 1")
 			## pmvnorm does not support a log=TRUE option; I suspect that we need that
-			## for the probabilities to be non-zero.
+			## for the probabilities to be non-zero.  Here we just call the pmvnorm
+                        ## function and then take logs.
 			if(length(continuous_vars) > 0) {
 				log_result[in_support] <- log_result[in_support] +
 					apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
 						mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
 										upper=b_x_discrete[support_row_ind, ],
-										mean=mean[discrete_vars],
+										mean=cond_means[support_row_ind, ],
 										sigma=conditional_sigma_discrete)
 					})
 			} else {
@@ -198,7 +201,7 @@ dpdtmvn <- function(x,
 					apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
 						mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
 										upper=b_x_discrete[support_row_ind, ],
-										mean=mean[discrete_vars],
+										mean=cond_means[support_row_ind, ],
 										sigma=conditional_sigma_discrete)
 					})
 			}
