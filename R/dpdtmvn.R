@@ -191,18 +191,18 @@ dpdtmvn <- function(x,
 			if(length(continuous_vars) > 0) {
 				log_result[in_support] <- log_result[in_support] +
 					apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
-						mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
+						log(mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
 										upper=b_x_discrete[support_row_ind, ],
 										mean=cond_means[support_row_ind, ],
-										sigma=conditional_sigma_discrete)
+										sigma=conditional_sigma_discrete))
 					})
 			} else {
 				log_result[in_support] <- 
 					apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
-						mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
+						log(mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
 										upper=b_x_discrete[support_row_ind, ],
 										mean=cond_means[support_row_ind, ],
-										sigma=conditional_sigma_discrete)
+										sigma=conditional_sigma_discrete))
 					})
 			}
 		}
