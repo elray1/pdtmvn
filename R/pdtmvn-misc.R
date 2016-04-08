@@ -13,6 +13,22 @@
 ## floor_x_minus_1
 ## calc_Schur_complement
 
+## Function borrowed from copula package and modified
+makePosDef <- function (mat, delta = 10^{-6}) 
+{
+    while(min(eigen(mat)$values) < delta) {
+        decomp <- eigen(mat)
+        Lambda <- decomp$values
+        Lambda[Lambda < 0] <- delta
+        Gamma <- decomp$vectors
+        newmat <- Gamma %*% diag(Lambda, nrow = nrow(Gamma)) %*% t(Gamma)
+        D <- 1/sqrt(diag(newmat))
+        mat <- diag(D, nrow = nrow(Gamma)) %*% newmat %*% diag(D, nrow = nrow(Gamma))
+    }
+    return(mat)
+}
+
+
 #' Function to determine whether observations are within the support of a
 #' pdTMVN distribution
 #' 
@@ -487,9 +503,9 @@ get_conditional_mvn_intermediate_params <- function(sigma,
     if(missing(conditional_sigma) || is.null(conditional_sigma)) {
         if(!missing(precision) && !is.null(precision)) {
             precision_free <- precision[free_vars, free_vars, drop=FALSE]
-            result$conditional_sigma <- solve(precision_free)
+            result$conditional_sigma <- makePosDef(solve(precision_free))
         } else {
-            result$conditional_sigma <- calc_Schur_complement(sigma, free_vars)
+            result$conditional_sigma <- makePosDef(calc_Schur_complement(sigma, free_vars))
         }
     } else {
         result$conditional_sigma <- conditional_sigma

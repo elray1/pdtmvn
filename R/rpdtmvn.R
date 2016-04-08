@@ -325,7 +325,7 @@ rpdtmvn_sample_w_fixed <- function(
                 )
             }
         )
-        lower_gen_w_fixed_disc <- apply(rbind(lower, lower_gen_w_fixed_disc),
+        lower_gen_w_fixed_disc <- apply(rbind(lower[fixed_continuous_var_names], lower_gen_w_fixed_disc),
             2,
             max)
         
@@ -338,7 +338,7 @@ rpdtmvn_sample_w_fixed <- function(
                 )
             }
         )
-        upper_gen_w_fixed_disc <- apply(rbind(upper, upper_gen_w_fixed_disc),
+        upper_gen_w_fixed_disc <- apply(rbind(upper[fixed_continuous_var_names], upper_gen_w_fixed_disc),
             2,
             max)
         
@@ -348,14 +348,15 @@ rpdtmvn_sample_w_fixed <- function(
             fixed_vars = which(fixed_vars %in% fixed_continuous_vars),
             free_vars = which(fixed_vars %in% fixed_discrete_vars),
             validate_level = validate_level)
-        mean_gen_w_fixed_disc <- temp$conditional_mean
+        mean_gen_w_fixed_disc <- as.vector(temp$conditional_mean)
         sigma_gen_w_fixed_disc <- temp$conditional_sigma
         
         w[, fixed_discrete_var_names] <- tmvtnorm::rtmvnorm(n = n,
             mean = mean_gen_w_fixed_disc,
             sigma = sigma_gen_w_fixed_disc,
             lower = lower_gen_w_fixed_disc,
-            upper = upper_gen_w_fixed_disc)
+            upper = upper_gen_w_fixed_disc,
+            algorithm = "gibbs")
     }
     
     return(w)
