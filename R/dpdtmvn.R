@@ -190,21 +190,52 @@ dpdtmvn <- function(x,
                         ## function and then take logs.
 			if(length(continuous_vars) > 0) {
 				log_result[in_support] <- log_result[in_support] +
-					apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
-						log(mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
+					apply(matrix(in_support), 1, function(support_row_ind) {
+						prob_orig_scale <- mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
 										upper=b_x_discrete[support_row_ind, ],
 										mean=cond_means[support_row_ind, ],
-										sigma=conditional_sigma_discrete))
+										sigma=conditional_sigma_discrete)
+                        if(prob_orig_scale > .Machine$double.eps) {
+                            return(log(prob_orig_scale))
+                        } else {
+                            return(-Inf)
+                        }
 					})
 			} else {
 				log_result[in_support] <- 
-					apply(matrix(seq_along(in_support)), 1, function(support_row_ind) {
-						log(mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
+					apply(matrix(in_support), 1, function(support_row_ind) {
+						prob_orig_scale <- mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
 										upper=b_x_discrete[support_row_ind, ],
 										mean=cond_means[support_row_ind, ],
-										sigma=conditional_sigma_discrete))
-					})
+										sigma=conditional_sigma_discrete)
+                        if(prob_orig_scale > .Machine$double.eps) {
+                            return(log(prob_orig_scale))
+                        } else {
+                            return(-Inf)
+                        }
+                    })
 			}
+            
+            ## For indices in the support where pmvnorm gave a result of 0,
+            ## approximate by (dmvnorm at center of integration region) *
+            ## (area of integration region).  This is very rough.
+            inds_neginf_in_support <- which(log_result[in_support] == -Inf)
+            if(length(inds_neginf_in_support) > 0) {
+                log_result[in_support[inds_neginf_in_support]] <-
+                    apply(matrix(in_support[inds_neginf_in_support]), 1, function(support_row_ind) {
+                        mvtnorm::dmvnorm(
+                            apply(
+                                rbind(a_x_discrete[support_row_ind, ], b_x_discrete[support_row_ind, ]),
+                                2,
+                                mean),
+                            mean = cond_means[support_row_ind, ],
+                            sigma = conditional_sigma_discrete,
+                            log = TRUE
+                        ) +
+                            sum(log(b_x_discrete[support_row_ind, ] -
+                                        a_x_discrete[support_row_ind, ]))
+                    })
+            }
 		}
 	}
 	
