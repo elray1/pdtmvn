@@ -78,6 +78,18 @@ dpdtmvn <- function(x,
             colnames(x) <- x_names
         }
 	}
+    
+#    ## Convert mean to matrix if a numeric vector or data frame was passed in
+#    if(!is.matrix(mean)) {
+#        if(is.data.frame(mean)) {
+#            mean <- as.matrix(mean)
+#        } else if(is.numeric(mean)) {
+#            mean_names <- names(mean)
+#            dim(mean) <- c(1, length(mean))
+#            colnames(mean) <- mean_names
+#        }
+#    }
+    
 	
 	## Validate parameters
 	if(validate_level > 0) {
@@ -104,7 +116,7 @@ dpdtmvn <- function(x,
 			assign(var_name, validated_params[[var_name]])
 		}
 		
-		rm("validated_params")
+#		rm("validated_params")
 	}
 	
 	## The rest of the code here is closely based on that in the
@@ -148,23 +160,38 @@ dpdtmvn <- function(x,
 		
 		## get lower and upper bounds on integration for each discrete
         ## observation
-		a_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-			do.call(discrete_var_range_fns[[discrete_var_ind]][["a"]],
-				list(x=x[in_support, discrete_vars[discrete_var_ind]])
-			)
-		})
-        b_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-            do.call(discrete_var_range_fns[[discrete_var_ind]][["b"]],
-                list(x=x[in_support, discrete_vars[discrete_var_ind]])
-            )
-        })
-        if(identical(length(discrete_vars), 1L)) {
-            a_x_discrete <- matrix(a_x_discrete)
-            b_x_discrete <- matrix(b_x_discrete)
-        } else {
-            a_x_discrete <- t(a_x_discrete)
-            b_x_discrete <- t(b_x_discrete)
+        a_x_discrete <- matrix(NA, nrow = nrow(x), ncol = length(discrete_vars))
+        for(discrete_var_ind in seq_along(discrete_vars)) {
+            a_x_discrete[, discrete_var_ind] <-
+                do.call(discrete_var_range_fns[[discrete_var_ind]][["a"]],
+                    list(x=x[, discrete_vars[discrete_var_ind]])
+                )
         }
+        b_x_discrete <- matrix(NA, nrow = nrow(x), ncol = length(discrete_vars))
+        for(discrete_var_ind in seq_along(discrete_vars)) {
+            b_x_discrete[, discrete_var_ind] <-
+                do.call(discrete_var_range_fns[[discrete_var_ind]][["b"]],
+                    list(x=x[, discrete_vars[discrete_var_ind]])
+                )
+        }
+        
+#		a_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
+#			do.call(discrete_var_range_fns[[discrete_var_ind]][["a"]],
+#				list(x=x[in_support, discrete_vars[discrete_var_ind]])
+#			)
+#		})
+#        b_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
+#            do.call(discrete_var_range_fns[[discrete_var_ind]][["b"]],
+#                list(x=x[in_support, discrete_vars[discrete_var_ind]])
+#            )
+#        })
+#        if(identical(length(discrete_vars), 1L)) {
+#            a_x_discrete <- matrix(a_x_discrete)
+#            b_x_discrete <- matrix(b_x_discrete)
+#        } else {
+#            a_x_discrete <- t(a_x_discrete)
+#            b_x_discrete <- t(b_x_discrete)
+#        }
         
 		if(identical(length(discrete_vars), 1L)) {
 			p_lt_b <- pnorm(b_x_discrete[, 1],
@@ -223,17 +250,21 @@ dpdtmvn <- function(x,
             if(length(inds_neginf_in_support) > 0) {
                 log_result[in_support[inds_neginf_in_support]] <-
                     apply(matrix(in_support[inds_neginf_in_support]), 1, function(support_row_ind) {
-                        mvtnorm::dmvnorm(
-                            apply(
-                                rbind(a_x_discrete[support_row_ind, ], b_x_discrete[support_row_ind, ]),
-                                2,
-                                mean),
-                            mean = cond_means[support_row_ind, ],
-                            sigma = conditional_sigma_discrete,
-                            log = TRUE
-                        ) +
-                            sum(log(b_x_discrete[support_row_ind, ] -
-                                        a_x_discrete[support_row_ind, ]))
+                        if(any(is.infinite(c(a_x_discrete[support_row_ind, ], b_x_discrete[support_row_ind, ])))) {
+                            return(-Inf)
+                        } else {
+                            mvtnorm::dmvnorm(
+                                apply(
+                                    rbind(a_x_discrete[support_row_ind, ], b_x_discrete[support_row_ind, ]),
+                                    2,
+                                    mean),
+                                mean = cond_means[support_row_ind, ],
+                                sigma = conditional_sigma_discrete,
+                                log = TRUE
+                            ) +
+                                sum(log(b_x_discrete[support_row_ind, ] -
+                                            a_x_discrete[support_row_ind, ]))
+                        }
                     })
             }
 		}
