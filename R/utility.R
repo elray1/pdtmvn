@@ -6,9 +6,10 @@ logspace_sub <- function(logx, logy) {
 	if(!identical(length(logx), length(logy))) {
 		stop("logx and logy must have the same length")
 	} else {
-		return(sapply(seq_along(logx), function(ind) {
-			return(.Call("logspace_sub_C", as.numeric(logx[ind]), as.numeric(logy[ind])))
-		}))
+#		return(sapply(seq_along(logx), function(ind) {
+#			return(.Call("logspace_sub_C", as.numeric(logx[ind]), as.numeric(logy[ind])))
+#		}))
+        return(logspace_sub_matrix_rows(cbind(logx, logy)))
 	}
 }
 
