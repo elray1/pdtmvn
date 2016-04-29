@@ -68,12 +68,26 @@ rpdtmvn <- function(n,
         } else if(is.data.frame(x_fixed)) {
             x_fixed <- as.matrix(x_fixed)
         }
+    } else {
+        x_fixed <- NULL
     }
+    
+#    ## Convert mean to matrix if a numeric vector or data frame was passed in
+#    if(!is.matrix(mean)) {
+#        if(is.data.frame(mean)) {
+#            mean <- as.matrix(mean)
+#        } else if(is.numeric(mean)) {
+#            mean_names <- names(mean)
+#            dim(mean) <- c(1, length(mean))
+#            colnames(mean) <- mean_names
+#        }
+#    }
+    
     
     ## Ensure that mean and sigma/precision have row and/or column names
     var_names <- NA
-    if(!identical(names(mean), NULL)) {
-        var_names <- names(mean)
+    if(!identical(colnames(mean), NULL)) {
+        var_names <- colnames(mean)
     }
     
     if(any(is.na(var_names)) && !missing(sigma)) {
@@ -136,7 +150,7 @@ rpdtmvn <- function(n,
         }
         
         ## validate data type of x_fixed
-        if(!missing(x_fixed) && !identical(nrow(x_fixed), 1L)) {
+        if(!missing(x_fixed) && !is.null(x_fixed) && !identical(nrow(x_fixed), 1L)) {
             stop("If supplied, x_fixed must be a vector or a matrix or data frame with one row")
         }
         
@@ -161,11 +175,11 @@ rpdtmvn <- function(n,
 			assign(var_name, validated_params[[var_name]])
 		}
 		
-		rm("validated_params")
+#		rm("validated_params")
 	}
 	
     ## in_support are row indices for observations in x_fixed in support
-    if(!missing(x_fixed) && validate_in_support) {
+    if(!missing(x_fixed) && !is.null(x_fixed) && validate_in_support) {
         x_fixed_continuous_vars <- which(
             which(var_names %in% colnames(x_fixed)) # inds for var_names that are in names(x_fixed)
             %in%
@@ -395,20 +409,26 @@ rpdtmvn_sample_w_free <- function(
     upper,
     validate_level) {
     
-    temp <- get_conditional_mvn_params(x_fixed = x_fixed,
-        mean = mean,
-        sigma = sigma,
-        fixed_vars = fixed_vars,
-        free_vars = free_vars,
-        validate_level = validate_level)
-    mean_w_free <- as.vector(temp$conditional_mean)
-    sigma_w_free <- temp$conditional_sigma
+    if(missing(x_fixed) || is.null(x_fixed)) {
+        mean_w_free <- mean
+        sigma_w_free <- sigma
+    } else {
+        temp <- get_conditional_mvn_params(x_fixed = x_fixed,
+            mean = mean,
+            sigma = sigma,
+            fixed_vars = fixed_vars,
+            free_vars = free_vars,
+            validate_level = validate_level)
+        mean_w_free <- as.vector(temp$conditional_mean)
+        sigma_w_free <- temp$conditional_sigma
+    }
     
     w[, free_vars] <- tmvtnorm::rtmvnorm(n = n,
         mean = mean_w_free,
         sigma = sigma_w_free,
         lower = lower[free_vars],
-        upper = upper[free_vars])
+        upper = upper[free_vars],
+        algorithm = "gibbs")
     
     return(w)
 }

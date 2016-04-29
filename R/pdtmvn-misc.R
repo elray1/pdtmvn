@@ -75,26 +75,42 @@ in_pdtmvn_support <- function(x,
 		## time here -- but for now, I expect such values to be rare.
 		
 		## the vector b_x for each row of x
-		b_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-			do.call(discrete_var_range_fns[[discrete_var_ind]][["b"]],
-				list(x=x[, discrete_vars[discrete_var_ind]])
-			)
-		})
-		if(identical(length(discrete_vars), 1L)) {
-			b_x_discrete <- matrix(b_x_discrete)
-		} else {
-			b_x_discrete <- t(b_x_discrete)
-		}
+        b_x_discrete <- matrix(NA, nrow = nrow(x), ncol = length(discrete_vars))
+        for(discrete_var_ind in seq_along(discrete_vars)) {
+            b_x_discrete[, discrete_var_ind] <-
+                do.call(discrete_var_range_fns[[discrete_var_ind]][["b"]],
+				    list(x=x[, discrete_vars[discrete_var_ind]])
+    			)
+        }
+#		b_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
+#			do.call(discrete_var_range_fns[[discrete_var_ind]][["b"]],
+#				list(x=x[, discrete_vars[discrete_var_ind]])
+#			)
+#		})
+#		if(identical(length(discrete_vars), 1L)) {
+#			b_x_discrete <- matrix(b_x_discrete)
+#		} else {
+#			b_x_discrete <- t(b_x_discrete)
+#		}
 		
 		## logical vector of length nrow(x) with whether all entries corresponding to
 		## discrete variables in row i of x are in their domains
-		in_discrete_dist_domain <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-		    do.call(discrete_var_range_fns[[discrete_var_ind]][["in_range"]],
-		        list(x=x[, discrete_vars[discrete_var_ind]])
-		    )
-		})
+        in_discrete_dist_domain <- matrix(NA, nrow = nrow(x), ncol = length(discrete_vars))
+        for(discrete_var_ind in seq_along(discrete_vars)) {
+            in_discrete_dist_domain[, discrete_var_ind] <-
+                do.call(discrete_var_range_fns[[discrete_var_ind]][["in_range"]],
+                    list(x=x[, discrete_vars[discrete_var_ind]])
+                )
+        }
+        
+#		in_discrete_dist_domain <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
+#		    do.call(discrete_var_range_fns[[discrete_var_ind]][["in_range"]],
+#		        list(x=x[, discrete_vars[discrete_var_ind]])
+#		    )
+#		})
+        
 		if(length(discrete_vars) > 1L) {
-		    in_discrete_dist_domain <- apply(t(in_discrete_dist_domain), 1, all)
+		    in_discrete_dist_domain <- apply(in_discrete_dist_domain, 1, all)
 		}
 	} else {
 		in_discrete_dist_domain <- rep(TRUE, nrow(x))
@@ -352,6 +368,9 @@ validate_params_pdtmvn <- function(x,
 	## fill in values for sigma_continuous, conditional_sigma_discrete, and
 	## conditional_mean_discrete_offset_multiplier if they are missing
 	## if they are provided, these parameter values are not validated
+    if(missing(sigma_continuous)) {
+        sigma_continuous <- NULL
+    }
     validated_params <- c(validated_params,
         compute_sigma_subcomponents(sigma = validated_params$sigma,
             precision = validated_params$precision,
@@ -410,7 +429,7 @@ compute_sigma_subcomponents <- function(sigma = NULL,
     
     if(length(continuous_vars) > 0) {
         ## Get sigma_continuous
-        if(missing(sigma_continuous)) {
+        if(missing(sigma_continuous) || is.null(sigma_continuous)) {
             if(!is.null(sigma)) {
                 ## sigma_continuous is a subset of sigma
                 sigma_subcomponents$sigma_continuous <- 
@@ -450,7 +469,8 @@ compute_sigma_subcomponents <- function(sigma = NULL,
     } else if(length(discrete_vars) > 0) {
         ## only discrete variables -- we only need conditional_sigma_discrete,
         ## not sigma_continuous or conditional_mean_discrete_offset_multiplier
-        if(missing(conditional_sigma_discrete)) {
+        if(missing(conditional_sigma_discrete) ||
+            is.null(conditional_sigma_discrete)) {
             if(!is.null(sigma)) {
                 sigma_subcomponents$conditional_sigma_discrete <- sigma
             } else {
@@ -516,7 +536,8 @@ get_conditional_mvn_intermediate_params <- function(sigma,
     
     ## Get conditional_mean_offset_multiplier
     if(length(fixed_vars) > 0) {
-        if(missing(conditional_mean_offset_multiplier)) {
+        if(missing(conditional_mean_offset_multiplier) ||
+            is.null(conditional_mean_offset_multiplier)) {
             if(!is.null(sigma)) {
                 sigma_fixed <- sigma[fixed_vars, fixed_vars, drop=FALSE]
                 sigma_free_fixed <- sigma[free_vars, fixed_vars, drop=FALSE]
@@ -633,8 +654,7 @@ get_conditional_mvn_mean_from_intermediate_params <- function(x_fixed,
         nrow_retval <- 1L
         try(nrow_retval <- nrow(x_fixed), silent = TRUE)
         cond_means <- matrix(rep(mean[free_vars], each = nrow_retval),
-            nrow=nrow_retval,
-            byrow=TRUE)
+            nrow=nrow_retval)
     }
     
     return(cond_means)
