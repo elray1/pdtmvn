@@ -35,6 +35,9 @@
 #'   logical, TRUE if x is in the support of the corresponding discrete variable
 #'   and FALSE otherwise; and the element named "discretizer" is a function that
 #'   takes continuous values and returns the corresponding discretized values.
+#' @param validate_in_support Logical; if TRUE, calculate whether x_fixed
+#'   is in the support specified by the corresponding entry in
+#'   discrete_var_range_fns.  If FALSE (risky!) this check is not performed.
 #' @param validate_level Numeric; if 0, no validation is performed (risky!).
 #'   If 1, parameters are validated but warnings about checks not performed are
 #'   not issued.  If 2, parameters are validated and warnings about checks not
@@ -71,18 +74,6 @@ rpdtmvn <- function(n,
     } else {
         x_fixed <- NULL
     }
-    
-#    ## Convert mean to matrix if a numeric vector or data frame was passed in
-#    if(!is.matrix(mean)) {
-#        if(is.data.frame(mean)) {
-#            mean <- as.matrix(mean)
-#        } else if(is.numeric(mean)) {
-#            mean_names <- names(mean)
-#            dim(mean) <- c(1, length(mean))
-#            colnames(mean) <- mean_names
-#        }
-#    }
-    
     
     ## Ensure that mean and sigma/precision have row and/or column names
     var_names <- NA
@@ -174,8 +165,6 @@ rpdtmvn <- function(n,
 		for(var_name in names(validated_params)) {
 			assign(var_name, validated_params[[var_name]])
 		}
-		
-#		rm("validated_params")
 	}
 	
     ## in_support are row indices for observations in x_fixed in support
@@ -295,6 +284,10 @@ rpdtmvn <- function(n,
 #'   of discrete_vars.  Each entry is a named list with at least two elements:
 #'   the element named "a" is a function that returns a(x) for any real x; the
 #'   element named "b" is a function that returns b(x) for any real x.
+#' @param validate_level Numeric; if 0, no validation is performed (risky!).
+#'   If 1, parameters are validated but warnings about checks not performed are
+#'   not issued.  If 2, parameters are validated and warnings about checks not
+#'   performed are issued.
 #' 
 #' @return matrix of values where columns corresponding to variables included in
 #'   x_fixed are filled in with samples from the joint distribution of the
@@ -316,19 +309,27 @@ rpdtmvn_sample_w_fixed <- function(
     discrete_vars,
     discrete_var_range_fns,
     validate_level) {
+    ## Two steps:
+    ##   (a) For continuous variables, w_fixed[i] = x_fixed[i]
+    ##   (b) For discrete variables, w_fixed[i] are drawn from the joint
+    ##     truncated multivariate normal distribution for the fixed discrete
+    ##     variables given the fixed continuous variables.  Truncation points
+    ##     are determined by lower/upper bounds for the distribution overall
+    ##     and lower/upper bounds for the region corresponding to the
+    ##     observed values in x_fixed
     
     fixed_continuous_vars <- fixed_vars[fixed_vars %in% continuous_vars]
     fixed_discrete_vars <- fixed_vars[fixed_vars %in% discrete_vars]
     fixed_continuous_var_names <- colnames(w)[fixed_continuous_vars]
     fixed_discrete_var_names <- colnames(w)[fixed_discrete_vars]
     
-    ## Step 1) (a)
+    ## Step (a)
     if(length(fixed_continuous_vars) > 0) {
         w[, fixed_continuous_var_names] <- rep(x_fixed[1, fixed_continuous_var_names],
             each = n)
     }
     
-    ## Step 1) (b)
+    ## Step (b)
     if(length(fixed_discrete_vars) > 0) {
         lower_gen_w_fixed_disc <- sapply(
             fixed_discrete_vars,
@@ -371,6 +372,31 @@ rpdtmvn_sample_w_fixed <- function(
             lower = lower_gen_w_fixed_disc,
             upper = upper_gen_w_fixed_disc,
             algorithm = "gibbs")
+        
+        ## The gibbs sampling algorithm in the tmvtnorm package works well and
+        ## is fast most of the time, but there are numerical problems
+        ## (very rarely) that I'm not going to debug.
+        ## Identify rows of w with missing values or values outside of the
+        ## range specified by lower_gen_w_fixed_disc and upper_gen_w_fixed_disc,
+        ## then sample again using the slower but more reliable rejection algorithm
+        rows_to_resample <- which(apply(
+            w[, fixed_discrete_var_names, drop = FALSE],
+            1,
+            function(w_row) {
+                any(is.na(w_row) |
+                        w_row < lower_gen_w_fixed_disc |
+                        w_row > upper_gen_w_fixed_disc)
+            }))
+        
+        if(length(rows_to_resample) > 0) {
+            w[rows_to_resample, fixed_discrete_var_names] <- tmvtnorm::rtmvnorm(
+                n = length(rows_to_resample),
+                mean = mean_gen_w_fixed_disc,
+                sigma = sigma_gen_w_fixed_disc,
+                lower = lower_gen_w_fixed_disc,
+                upper = upper_gen_w_fixed_disc,
+                algorithm = "rejection")
+        }
     }
     
     return(w)
@@ -394,6 +420,10 @@ rpdtmvn_sample_w_fixed <- function(
 #'   rep(-Inf, length = length(mean)).
 #' @param upper Vector of upper truncation points, default is 
 #'   rep(Inf, length = length(mean)).
+#' @param validate_level Numeric; if 0, no validation is performed (risky!).
+#'   If 1, parameters are validated but warnings about checks not performed are
+#'   not issued.  If 2, parameters are validated and warnings about checks not
+#'   performed are issued.
 #' 
 #' @return matrix of values simulated from the TMVN distribution
 rpdtmvn_sample_w_free <- function(
