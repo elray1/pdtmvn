@@ -42,6 +42,9 @@
 #'   logical, TRUE if x is in the support of the corresponding discrete variable
 #'   and FALSE otherwise.
 #' @param log Logical; if TRUE, return value is log(density).
+#' @param validate_in_support Logical; if TRUE, calculate whether each row of x
+#'   is in the support specified by the corresponding entry in
+#'   discrete_var_range_fns.  If FALSE (risky!) this check is not performed.
 #' @param validate_level Numeric; if 0, no validation is performed (risky!).
 #'   If 1, parameters are validated but warnings about checks not performed are
 #'   not issued.  If 2, parameters are validated and warnings about checks not
@@ -79,20 +82,9 @@ dpdtmvn <- function(x,
         }
 	}
     
-#    ## Convert mean to matrix if a numeric vector or data frame was passed in
-#    if(!is.matrix(mean)) {
-#        if(is.data.frame(mean)) {
-#            mean <- as.matrix(mean)
-#        } else if(is.numeric(mean)) {
-#            mean_names <- names(mean)
-#            dim(mean) <- c(1, length(mean))
-#            colnames(mean) <- mean_names
-#        }
-#    }
-    
-	
 	## Validate parameters
 	if(validate_level > 0) {
+        ## validate_params_pdtmvn lives in the file pdtmvn-misc.R
 		validated_params <- validate_params_pdtmvn(x = x,
 			mean = mean,
 			sigma = sigma,
@@ -115,8 +107,6 @@ dpdtmvn <- function(x,
 		for(var_name in names(validated_params)) {
 			assign(var_name, validated_params[[var_name]])
 		}
-		
-#		rm("validated_params")
 	}
 	
 	## The rest of the code here is closely based on that in the
@@ -137,7 +127,8 @@ dpdtmvn <- function(x,
         in_support <- seq_len(nrow(x))
     }
     
-	## compute result -- computations are on log scale
+    ## Storage space for result -- computations are on log scale, so initialize
+    ## to -Inf
 	log_result <- rep(-Inf, nrow(x))
 	
 	## Compute contribution from observations of continuous variables
@@ -175,47 +166,52 @@ dpdtmvn <- function(x,
                 )
         }
         
-#		a_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-#			do.call(discrete_var_range_fns[[discrete_var_ind]][["a"]],
-#				list(x=x[in_support, discrete_vars[discrete_var_ind]])
-#			)
-#		})
-#        b_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-#            do.call(discrete_var_range_fns[[discrete_var_ind]][["b"]],
-#                list(x=x[in_support, discrete_vars[discrete_var_ind]])
-#            )
-#        })
-#        if(identical(length(discrete_vars), 1L)) {
-#            a_x_discrete <- matrix(a_x_discrete)
-#            b_x_discrete <- matrix(b_x_discrete)
-#        } else {
-#            a_x_discrete <- t(a_x_discrete)
-#            b_x_discrete <- t(b_x_discrete)
-#        }
-        
+        ## Do the integration to calculate discretized density values
 		if(identical(length(discrete_vars), 1L)) {
-			p_lt_b <- pnorm(b_x_discrete[, 1],
+			p_lt_b <- pnorm(b_x_discrete[in_support, 1],
 				mean = as.vector(cond_means),
 				sd = sqrt(as.vector(conditional_sigma_discrete)),
 				log = TRUE)
 			
-			p_lt_a <- pnorm(a_x_discrete[, 1],
+			p_lt_a <- pnorm(a_x_discrete[in_support, 1],
 				mean = as.vector(cond_means),
 				sd = sqrt(as.vector(conditional_sigma_discrete)),
 				log = TRUE)
 			
-			if(length(continuous_vars) > 0) {
-				log_result[in_support] <- log_result[in_support] +
-					logspace_sub(p_lt_b, p_lt_a)
-			} else {
-				log_result[in_support] <- logspace_sub(p_lt_b, p_lt_a)
-			}
-		} else {
-#			stop("dpdtmvn does not currently support discrete_vars with length > 1")
-			## pmvnorm does not support a log=TRUE option; I suspect that we need that
-			## for the probabilities to be non-zero.  Here we just call the pmvnorm
-                        ## function and then take logs.
-			if(length(continuous_vars) > 0) {
+            if(identical(p_lt_b, 0) || identical(p_lt_a, 0)) {
+                p_gt_b <- pnorm(b_x_discrete[in_support, 1],
+                    mean = as.vector(cond_means),
+                    sd = sqrt(as.vector(conditional_sigma_discrete)),
+                    lower.tail = FALSE,
+                    log = TRUE)
+                
+                p_gt_a <- pnorm(a_x_discrete[in_support, 1],
+                    mean = as.vector(cond_means),
+                    sd = sqrt(as.vector(conditional_sigma_discrete)),
+                    lower.tail = FALSE,
+                    log = TRUE)
+                
+                if(length(continuous_vars) > 0) {
+                    log_result[in_support] <- log_result[in_support] +
+                        logspace_sub(p_gt_a, p_gt_b)
+                } else {
+                    log_result[in_support] <- logspace_sub(p_gt_a, p_gt_b)
+                }
+            } else {
+    			if(length(continuous_vars) > 0) {
+    				log_result[in_support] <- log_result[in_support] +
+    					logspace_sub(p_lt_b, p_lt_a)
+    			} else {
+    				log_result[in_support] <- logspace_sub(p_lt_b, p_lt_a)
+    			}
+            }
+        } else {
+            ## pmvnorm does not support a log=TRUE option.  Here we just call
+            ## the pmvnorm function and then take logs.
+            if(length(continuous_vars) > 0) {
+                ## We probably need some more careful handling of NA values
+                ## here.  A mixture of continuous and discrete vaules hasn't
+                ## come up in my applications, so this block is untested.
 				log_result[in_support] <- log_result[in_support] +
 					apply(matrix(in_support), 1, function(support_row_ind) {
 						prob_orig_scale <- mvtnorm::pmvnorm(lower=a_x_discrete[support_row_ind, ],
@@ -235,7 +231,9 @@ dpdtmvn <- function(x,
 										upper=b_x_discrete[support_row_ind, ],
 										mean=cond_means[support_row_ind, ],
 										sigma=conditional_sigma_discrete)
-                        if(prob_orig_scale > .Machine$double.eps) {
+                        if(is.na(prob_orig_scale)) {
+                            return(NA)
+                        } else if(prob_orig_scale > .Machine$double.eps) {
                             return(log(prob_orig_scale))
                         } else {
                             return(-Inf)
@@ -246,26 +244,35 @@ dpdtmvn <- function(x,
             ## For indices in the support where pmvnorm gave a result of 0,
             ## approximate by (dmvnorm at center of integration region) *
             ## (area of integration region).  This is very rough.
-            inds_neginf_in_support <- which(log_result[in_support] == -Inf)
-            if(length(inds_neginf_in_support) > 0) {
-                log_result[in_support[inds_neginf_in_support]] <-
-                    apply(matrix(in_support[inds_neginf_in_support]), 1, function(support_row_ind) {
-                        if(any(is.infinite(c(a_x_discrete[support_row_ind, ], b_x_discrete[support_row_ind, ])))) {
-                            return(-Inf)
-                        } else {
-                            mvtnorm::dmvnorm(
-                                apply(
-                                    rbind(a_x_discrete[support_row_ind, ], b_x_discrete[support_row_ind, ]),
-                                    2,
-                                    mean),
-                                mean = cond_means[support_row_ind, ],
-                                sigma = conditional_sigma_discrete,
-                                log = TRUE
-                            ) +
-                                sum(log(b_x_discrete[support_row_ind, ] -
-                                            a_x_discrete[support_row_ind, ]))
-                        }
-                    })
+            ## only do this if mvtnorm::pmvnorm did not return any NA values.
+            ## this occurs due to numerical instability in the calculations
+            ## done in the mvtnorm package that I'm not going to debug/fix.
+            ## these issues affect both pmvnorm and dmvnorm, and would throw
+            ## off the calculations here.  We leave NA values as -Inf.
+            if(!any(is.na(log_result))) {
+                inds_neginf_in_support <- which(log_result[in_support] == -Inf)
+                if(length(inds_neginf_in_support) > 0) {
+                    log_result[in_support[inds_neginf_in_support]] <-
+                        apply(matrix(in_support[inds_neginf_in_support]), 1, function(support_row_ind) {
+                            if(any(is.infinite(c(a_x_discrete[support_row_ind, ], b_x_discrete[support_row_ind, ])))) {
+                                return(-Inf)
+                            } else {
+                                mvtnorm::dmvnorm(
+                                    apply(
+                                        rbind(a_x_discrete[support_row_ind, ], b_x_discrete[support_row_ind, ]),
+                                        2,
+                                        mean),
+                                    mean = cond_means[support_row_ind, ],
+                                    sigma = conditional_sigma_discrete,
+                                    log = TRUE
+                                ) +
+                                    sum(log(b_x_discrete[support_row_ind, ] -
+                                                a_x_discrete[support_row_ind, ]))
+                            }
+                        })
+                }
+            } else {
+                log_result[is.na(log_result)] <- -Inf
             }
 		}
 	}
