@@ -1,6 +1,7 @@
 ## Miscellaneous functions used in evaluating and sampling from the pdtmvn
 ## distribution.
 ## 
+## make_pos_def
 ## in_pdtmvn_support
 ## calc_in_truncation_support
 ## validate_params_pdtmvn
@@ -13,8 +14,17 @@
 ## floor_x_minus_1
 ## calc_Schur_complement
 
-## Function borrowed from copula package and modified
-makePosDef <- function (mat, delta = 10^{-6}) 
+#' Convert the matrix mat into a positive definite matrix
+#' Function borrowed from the copula package and modified: the implementation
+#' in the copula doesn't always give a positive definite matrix.
+#' There's got to be a better way to do this.
+#' 
+#' @param mat a square matrix object
+#' @param delta A number that's vaguely related to what the smallest eigenvalue
+#'   of the result should be
+#' 
+#' @return a matrix "near" to mat that is positive definite.
+make_pos_def <- function (mat, delta = 10^{-6}) 
 {
     while(min(eigen(mat)$values) < delta) {
         decomp <- eigen(mat)
@@ -47,9 +57,9 @@ makePosDef <- function (mat, delta = 10^{-6})
 #'   named "a" is a character string with the name of a function that returns
 #'   a(x) for any real x, the element named "b" is a character string with the
 #'   name of a function that returns b(x) for any real x, and the element named
-#'   "in_range" is a character string with the name of a function that returns a
-#'   logical, TRUE if x is in the support of the corresponding discrete variable
-#'   and FALSE otherwise.
+#'   "in_range" is a character string with the name of a function that returns
+#'   a logical, TRUE if x is in the support of the corresponding discrete
+#'   variable and FALSE otherwise.
 #' 
 #' @return Integer vector with indices of rows of x that are in the support of
 #'   the pdtmvn distribution
@@ -74,25 +84,6 @@ in_pdtmvn_support <- function(x,
 		## if there were a lot of x's outside of truncation support, we could save
 		## time here -- but for now, I expect such values to be rare.
 		
-		## the vector b_x for each row of x
-        b_x_discrete <- matrix(NA, nrow = nrow(x), ncol = length(discrete_vars))
-        for(discrete_var_ind in seq_along(discrete_vars)) {
-            b_x_discrete[, discrete_var_ind] <-
-                do.call(discrete_var_range_fns[[discrete_var_ind]][["b"]],
-				    list(x=x[, discrete_vars[discrete_var_ind]])
-    			)
-        }
-#		b_x_discrete <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-#			do.call(discrete_var_range_fns[[discrete_var_ind]][["b"]],
-#				list(x=x[, discrete_vars[discrete_var_ind]])
-#			)
-#		})
-#		if(identical(length(discrete_vars), 1L)) {
-#			b_x_discrete <- matrix(b_x_discrete)
-#		} else {
-#			b_x_discrete <- t(b_x_discrete)
-#		}
-		
 		## logical vector of length nrow(x) with whether all entries corresponding to
 		## discrete variables in row i of x are in their domains
         in_discrete_dist_domain <- matrix(NA, nrow = nrow(x), ncol = length(discrete_vars))
@@ -102,12 +93,6 @@ in_pdtmvn_support <- function(x,
                     list(x=x[, discrete_vars[discrete_var_ind]])
                 )
         }
-        
-#		in_discrete_dist_domain <- plyr::laply(seq_along(discrete_vars), function(discrete_var_ind) {
-#		    do.call(discrete_var_range_fns[[discrete_var_ind]][["in_range"]],
-#		        list(x=x[, discrete_vars[discrete_var_ind]])
-#		    )
-#		})
         
 		if(length(discrete_vars) > 1L) {
 		    in_discrete_dist_domain <- apply(in_discrete_dist_domain, 1, all)
@@ -137,9 +122,11 @@ calc_in_truncation_support <- function(x, lower, upper) {
 	storage.mode(lower) <- "double"
 	storage.mode(upper) <- "double"
 	
+    ## The C routine called here returns an integer vector of 0s and 1s;
+    ## convert to logical.
 	return(as.logical(.Call("in_truncation_support_C", x, lower, upper)))
 }
-	
+
 #' Validate the parameters of a call to dpdtmvn
 #' 
 #' @param x matrix of quantiles.  If x is a matrix, each row is taken to be a
@@ -357,10 +344,6 @@ validate_params_pdtmvn <- function(x,
 		}
 	}
 
-#	if(length(discrete_vars) > 1) {
-#		stop("dpdtmvn does not currently support discrete_vars with length > 1.")
-#	}
-
 	validated_params$continuous_vars <- continuous_vars
 	validated_params$discrete_vars <- discrete_vars
 	
@@ -489,7 +472,7 @@ compute_sigma_subcomponents <- function(sigma = NULL,
     return(sigma_subcomponents)
 }
 
-#' Compute "intermediate paramaters" for the conditional distribution of a
+#' Compute "intermediate parameters" for the conditional distribution of a
 #' subset of variables in a multivariate normal random vector given the other
 #' variables in the vector.  These are the conditional covariance matrix and the
 #' matrix that is used as a multiplier to obtain the conditional mean.  As a
@@ -506,6 +489,9 @@ compute_sigma_subcomponents <- function(sigma = NULL,
 #'   free variables given the fixed variables
 #' @param conditional_mean_offset_multiplier (OPTIONAL) matrix used in computing
 #'   the conditional mean of the free variables given the fixed variables
+#' @param validate_level Numeric; if <= 1, NO validation is performed, but warnings
+#'   about things that were not checked are not issued.  If 2, NO validation is
+#'   performed, but warnings about things that were not checked are issued.
 #' 
 #' @return a named list with two entries: conditional_sigma and
 #'   conditional_mean_offset_multiplier
@@ -523,9 +509,9 @@ get_conditional_mvn_intermediate_params <- function(sigma,
     if(missing(conditional_sigma) || is.null(conditional_sigma)) {
         if(!missing(precision) && !is.null(precision)) {
             precision_free <- precision[free_vars, free_vars, drop=FALSE]
-            result$conditional_sigma <- makePosDef(solve(precision_free))
+            result$conditional_sigma <- make_pos_def(solve(precision_free))
         } else {
-            result$conditional_sigma <- makePosDef(calc_Schur_complement(sigma, free_vars))
+            result$conditional_sigma <- make_pos_def(calc_Schur_complement(sigma, free_vars))
         }
     } else {
         result$conditional_sigma <- conditional_sigma
@@ -582,6 +568,9 @@ get_conditional_mvn_intermediate_params <- function(sigma,
 #'   free variables given the fixed variables
 #' @param conditional_mean_offset_multiplier (OPTIONAL) matrix used in computing
 #'   the conditional mean of the free variables given the fixed variables
+#' @param validate_level Numeric; if <= 1, NO validation is performed, and warnings
+#'   about things that were not checked are not issued.  If 2, NO validation is
+#'   performed, but warnings about things that were not checked are issued.
 #' 
 #' @return a named list with two entries: conditional_sigma and
 #'   conditional_mean_offset_multiplier
@@ -652,7 +641,7 @@ get_conditional_mvn_mean_from_intermediate_params <- function(x_fixed,
             x_fixed_differences %*% t(conditional_mean_offset_multiplier)
     } else {
         nrow_retval <- 1L
-        try(nrow_retval <- nrow(x_fixed), silent = TRUE)
+        try(nrow_retval <- nrow(x_fixed), silent = TRUE) # x_fixed may or may not be defined
         cond_means <- matrix(rep(mean[free_vars], each = nrow_retval),
             nrow=nrow_retval)
     }
@@ -720,7 +709,7 @@ floor_x_minus_1 <- function(x) {
 #' @param X A square matrix
 #' @param inds Indices specifying the rows/columns of the block within X
 #'   to compute the Schur complement of.
-#'   
+#' 
 #' @return The Schur complement of the submatrix of X specified by inds:
 #'   A - B D^{-1} C, where A is the submatrix of X specified by inds,
 #'   B is the submatrix with rows given by inds and columns not in inds,

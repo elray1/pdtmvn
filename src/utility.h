@@ -1,6 +1,6 @@
 /* 
  ============================================================================
- Name        : utilityFunctions.h
+ Name        : utility.h
  Author      : Evan Ray
  Version     :
  Copyright   : 

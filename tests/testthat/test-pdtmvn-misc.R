@@ -16,7 +16,7 @@
 ## S floor_x_minus_1
 ## I calc_Schur_complement
 
-context("pdtmvn-misc -- no tests implemented")
+context("pdtmvn-misc")
 
 ## We should implement tests here for numerical stability?
 #test_that("calc_Schur_complement works", {

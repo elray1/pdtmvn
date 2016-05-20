@@ -6,7 +6,7 @@
 ## 
 ##  rpdtmvn
 
-context("rpdtmvn")
+context("rpdtmvn -- no tests written")
 
 x_minus_0.5 <- function(x) {
     x - 0.5
